@@ -15,33 +15,16 @@
   <main class="shell" id="profileMain"><div class="loading">Loading business…</div></main>
 </div>
 
-<!-- Resume-in-progress banner (shown if a nav session to this business was interrupted) -->
-<div id="navResumeBar" class="hidden"></div>
-
 <!-- Full-screen navigation overlay, hidden until "Start navigation" -->
 <div id="navPanel" class="hidden">
   <div id="navMap"></div>
 
-  <!-- Route preview / overview sheet, shown before turn-by-turn tracking begins -->
-  <div id="navPreview" class="nav-preview hidden">
-    <button class="nav-exit" id="navPreviewCloseBtn">←</button>
-    <div class="nav-preview-sheet">
-      <div class="nav-preview-dest">
-        <div class="nav-dest-dot"></div>
-        <div><strong id="navPreviewName">—</strong><span id="navPreviewAddr"></span></div>
-      </div>
-      <div class="nav-mode-row" id="navModeRow">
-        <button class="nav-mode-btn active" data-mode="driving">🚗 Drive</button>
-        <button class="nav-mode-btn" data-mode="foot">🚶 Walk</button>
-        <button class="nav-stop-btn" id="navAddStopBtn">+ Add a stop</button>
-      </div>
-      <div class="nav-alt-list" id="navAltList"><div class="loading">Finding routes…</div></div>
-      <button class="btn primary block" id="navGoBtn" disabled>Go →</button>
-      <p class="nav-preview-hint" id="navPreviewHint">Tap the map to drop a stop (e.g. where you'll park) before you go.</p>
-    </div>
+  <div class="nav-acquiring" id="navAcquiring">
+    <div class="nav-radar"><span></span><span></span><span></span></div>
+    <div class="nav-acquiring-text">Locating you…</div>
   </div>
 
-  <div class="nav-topbar" id="navTopbar">
+  <div class="nav-topbar">
     <button class="nav-exit" id="navExitBtn">←</button>
     <div class="nav-instruction">
       <div class="nav-instruction-icon" id="navIcon">↑</div>
@@ -52,23 +35,27 @@
       </div>
     </div>
   </div>
-  <div class="nav-next-up hidden" id="navNextUp"><span>Then</span> <strong id="navNextText"></strong></div>
-
-  <div class="nav-gps-pill"><span class="nav-gps-dot" id="navGpsDot"></span><span id="navGpsText">GPS</span><span class="nav-speed" id="navSpeed"></span></div>
-  <div class="nav-banner" id="navBanner"></div>
 
   <div class="nav-side-controls">
-    <button class="nav-side-btn" id="navHeadingBtn" title="Heading-up / North-up">🧭</button>
-    <button class="nav-side-btn" id="navStyleBtn" title="Map style">🗺️</button>
-    <button class="nav-side-btn" id="navThemeBtn" title="Day / Night">🌙</button>
-    <button class="nav-side-btn" id="navUnitsBtn" title="Units">km</button>
+    <button class="nav-compass" id="navCompassBtn" title="Toggle heading-up / north-up">
+      <svg id="navCompassSvg" viewBox="0 0 24 24" fill="none">
+        <circle cx="12" cy="12" r="10" stroke="rgba(255,255,255,.35)" stroke-width="1.4"/>
+        <path d="M12 3L14.5 12L12 21L9.5 12L12 3Z" fill="#FF5A1F"/>
+        <path d="M12 3L14.5 12L12 12L12 3Z" fill="#fff"/>
+        <text x="12" y="6.6" text-anchor="middle" font-size="4.2" fill="#fff" font-family="Manrope,sans-serif" font-weight="800">N</text>
+      </svg>
+    </button>
+    <button class="nav-tilt-btn" id="navTiltBtn">3D</button>
   </div>
-  <button class="nav-recenter" id="navRecenterBtn">◎</button>
 
+  <div class="nav-gps-pill"><span class="nav-gps-dot" id="navGpsDot"></span><span id="navGpsText">GPS</span></div>
+  <div class="nav-banner" id="navBanner"></div>
+  <button class="nav-recenter" id="navRecenterBtn">◎</button>
   <div class="nav-bottom">
     <div class="nav-stats">
       <div class="nav-stat"><strong id="navRemaining">—</strong><span>Remaining</span></div>
       <div class="nav-stat"><strong id="navEta">—</strong><span>ETA</span></div>
+      <div class="nav-stat"><strong id="navSpeed">—</strong><span>Speed</span></div>
       <div class="nav-stat"><strong id="navAccuracy">—</strong><span>GPS</span></div>
     </div>
     <div class="nav-dest-row">
@@ -77,8 +64,6 @@
     </div>
     <div class="nav-actions">
       <button class="nav-action-btn" id="navMuteBtn">🔇 Voice</button>
-      <button class="nav-action-btn" id="navRepeatBtn">🔁 Repeat</button>
-      <button class="nav-action-btn" id="navShareBtn">↗ Share ETA</button>
       <button class="nav-action-btn" id="navStopBtn">Exit</button>
       <button class="nav-action-btn primary" id="navDetailsBtn">Details</button>
     </div>
@@ -90,6 +75,5 @@
 <script src="js/api.js"></script>
 <script src="js/nav.js"></script>
 <script src="js/business.js"></script>
-<script src="js/nav3d.js"></script>
 </body>
 </html>

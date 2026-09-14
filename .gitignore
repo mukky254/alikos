@@ -1,0 +1,8 @@
+node_modules/
+.env
+aliko.db
+aliko.db-journal
+aliko.db-wal
+aliko.db-shm
+uploads/*
+!uploads/.gitkeep

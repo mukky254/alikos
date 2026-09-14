@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>List a business — Aliko</title><link rel="stylesheet" href="css/style.css"></head>
+<body>
+<div id="app">
+  <div id="site-header"></div>
+  <main class="shell narrow">
+    <h1 class="page-title">List your business</h1>
+    <p class="page-sub">Exact location details so customers stop getting lost.</p>
+    <div id="errorBox"></div>
+    <form id="registerForm">
+      <fieldset>
+        <legend>Business info</legend>
+        <div class="field"><label>Business name</label><input required id="f-name"><div id="dupWarning"></div></div>
+        <div class="field"><label>Category</label>
+          <select id="f-category" required>
+            <option value="">Select category</option>
+            <option>Electronics</option><option>Phone Repair</option><option>Laptop Repair</option>
+            <option>Pharmacy</option><option>Barber & Salon</option><option>Hotel</option>
+            <option>Restaurant & Café</option><option>Fashion & Boutique</option><option>Other</option>
+          </select>
+        </div>
+        <div class="field-grid">
+          <div class="field"><label>Phone</label><input required id="f-phone"></div>
+          <div class="field"><label>WhatsApp</label><input id="f-whatsapp"></div>
+        </div>
+        <div class="field"><label>Description</label><textarea id="f-desc" rows="3"></textarea></div>
+        <div class="field"><label>Products / keywords (comma-separated)</label><input id="f-tags" placeholder="e.g. iphone charger, usb cable"></div>
+      </fieldset>
+      <fieldset>
+        <legend>Exact location</legend>
+        <div class="gps-box">
+          <button type="button" class="btn" id="captureGpsBtn">📍 Capture GPS location</button>
+          <div class="gps-status" id="gpsStatus">Not captured yet.</div>
+        </div>
+        <div class="field-grid">
+          <div class="field"><label>Latitude</label><input id="f-lat" type="number" step="any" required></div>
+          <div class="field"><label>Longitude</label><input id="f-lng" type="number" step="any" required></div>
+        </div>
+        <div class="field-grid">
+          <div class="field"><label>Building</label><input required id="f-building"></div>
+          <div class="field"><label>Floor</label><input id="f-floor"></div>
+          <div class="field"><label>Shop</label><input id="f-shop"></div>
+        </div>
+        <div class="field-grid">
+          <div class="field"><label>Entrance</label><input id="f-entrance"></div>
+          <div class="field"><label>Landmark</label><input id="f-landmark"></div>
+        </div>
+      </fieldset>
+      <button class="btn primary block" type="submit">Submit for verification</button>
+    </form>
+  </main>
+</div>
+<script src="js/api.js"></script>
+<script src="js/nav.js"></script>
+<script src="js/register.js"></script>
+</body>
+</html>

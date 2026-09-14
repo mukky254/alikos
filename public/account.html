@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Account — Aliko</title><link rel="stylesheet" href="css/style.css"></head>
+<body>
+<div id="app">
+  <div id="site-header"></div>
+  <main class="shell narrow">
+    <h1 class="page-title">Account settings</h1>
+    <div class="card">
+      <h3>Profile</h3>
+      <div id="profileError"></div>
+      <form id="profileForm">
+        <div class="field"><label>Full name</label><input required id="p-name"></div>
+        <div class="field"><label>Email</label><input id="p-email" disabled></div>
+        <button class="btn primary" type="submit">Save name</button>
+      </form>
+    </div>
+    <div class="card">
+      <h3>Change password</h3>
+      <div id="pwError"></div>
+      <form id="pwForm">
+        <div class="field"><label>Current password</label><input required type="password" id="p-current"></div>
+        <div class="field"><label>New password</label><input required type="password" id="p-new" minlength="6"></div>
+        <button class="btn" type="submit">Update password</button>
+      </form>
+    </div>
+  </main>
+</div>
+<script src="js/api.js"></script>
+<script src="js/nav.js"></script>
+<script>
+renderNav('account');
+const user = requireLogin();
+if (user) { document.getElementById('p-name').value = user.name; document.getElementById('p-email').value = user.email; }
+document.getElementById('profileForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  try { const { token } = await api('/auth/me', { method: 'PUT', body: { name: document.getElementById('p-name').value.trim() } }); setToken(token); toast('Name updated.'); renderNav('account'); }
+  catch (err) { document.getElementById('profileError').innerHTML = `<div class="error-box">${escapeHtml(err.message)}</div>`; }
+});
+document.getElementById('pwForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  try { await api('/auth/password', { method: 'PUT', body: { currentPassword: document.getElementById('p-current').value, newPassword: document.getElementById('p-new').value } }); toast('Password updated.'); e.target.reset(); }
+  catch (err) { document.getElementById('pwError').innerHTML = `<div class="error-box">${escapeHtml(err.message)}</div>`; }
+});
+</script>
+</body>
+</html>

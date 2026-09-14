@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Recently viewed — Aliko</title><link rel="stylesheet" href="css/style.css"></head>
+<body>
+<div id="app">
+  <div id="site-header"></div>
+  <main class="shell">
+    <h1 class="page-title">🕘 Recently viewed</h1>
+    <p class="page-sub">Kept locally in this browser.</p>
+    <div class="directory" id="recentResults"></div>
+  </main>
+</div>
+<script src="js/api.js"></script>
+<script src="js/nav.js"></script>
+<script>
+renderNav('home');
+const list = JSON.parse(localStorage.getItem('aliko_recent') || '[]');
+const wrap = document.getElementById('recentResults');
+wrap.innerHTML = list.length ? list.map((b) => `
+  <a class="row" href="business.html?id=${b.id}">
+    <div class="plate">·</div>
+    <div class="row-main"><div class="row-name">${escapeHtml(b.name)}</div><div class="row-meta">${escapeHtml(b.category)}</div><div class="row-loc">${escapeHtml(b.building)}</div></div>
+  </a>`).join('') : '<div class="empty">Nothing viewed yet.</div>';
+</script>
+</body>
+</html>

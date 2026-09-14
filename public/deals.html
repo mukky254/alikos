@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Deals — Aliko</title><link rel="stylesheet" href="css/style.css"></head>
+<body>
+<div id="app">
+  <div id="site-header"></div>
+  <main class="shell">
+    <h1 class="page-title">🏷 Deals near you</h1>
+    <p class="page-sub">Active offers, sorted by distance if you share your location.</p>
+    <button class="btn primary" id="nearMeBtn" style="margin-bottom:16px;">Use my location</button>
+    <div class="directory" id="dealsResults"><div class="loading">Loading…</div></div>
+  </main>
+</div>
+<script src="js/api.js"></script>
+<script src="js/nav.js"></script>
+<script>
+renderNav('deals');
+async function load(lat, lng) {
+  const wrap = document.getElementById('dealsResults');
+  try {
+    const params = new URLSearchParams();
+    if (lat != null) { params.set('lat', lat); params.set('lng', lng); }
+    const { businesses } = await api('/businesses/deals?' + params.toString());
+    if (!businesses.length) { wrap.innerHTML = '<div class="empty">No active deals right now.</div>'; return; }
+    wrap.innerHTML = businesses.map((b) => `
+      <a class="row" href="business.html?id=${b.id}">
+        <div class="plate">${escapeHtml(b.floor || '·')}<br>${escapeHtml(b.shop || '')}</div>
+        <div class="row-main"><div class="row-name">${escapeHtml(b.name)} <span class="badge premium">${escapeHtml(b.offer_discount || 'DEAL')}</span></div>
+        <div class="row-meta">${escapeHtml(b.offer_title)}</div><div class="row-loc">${escapeHtml(b.building)} · ends ${new Date(b.offer_ends_at * 1000).toLocaleDateString()}</div></div>
+        ${b.distanceKm != null ? `<div class="row-dist">${fmtDist(b.distanceKm)}</div>` : ''}
+      </a>`).join('');
+  } catch (e) { wrap.innerHTML = `<div class="error-box">${escapeHtml(e.message)}</div>`; }
+}
+document.getElementById('nearMeBtn').addEventListener('click', () => {
+  navigator.geolocation.getCurrentPosition((pos) => load(pos.coords.latitude, pos.coords.longitude), () => toast('Could not get your location.'));
+});
+load();
+</script>
+</body>
+</html>

@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Log in — Aliko</title><link rel="stylesheet" href="css/style.css"></head>
+<body>
+<div id="app">
+  <div id="site-header"></div>
+  <main class="shell narrow">
+    <div class="card auth-card">
+      <h2 style="margin-bottom:16px;">Log in</h2>
+      <div id="errorBox"></div>
+      <form id="loginForm">
+        <div class="field"><label>Email</label><input required type="email" id="email"></div>
+        <div class="field"><label>Password</label><input required type="password" id="password"></div>
+        <button class="btn primary block" type="submit">Log in</button>
+      </form>
+      <p class="page-sub" style="margin-top:16px;">No account? <a href="signup.html" style="text-decoration:underline;">Sign up</a> · <a href="forgot-password.html" style="text-decoration:underline;">Forgot password?</a></p>
+      <p class="note">Demo owner: demo.owner@aliko.local / DemoOwner123!</p>
+    </div>
+  </main>
+</div>
+<script src="js/api.js"></script>
+<script src="js/nav.js"></script>
+<script>
+renderNav('login');
+document.getElementById('loginForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  try {
+    const { token } = await api('/auth/login', { method: 'POST', body: { email: document.getElementById('email').value.trim(), password: document.getElementById('password').value } });
+    setToken(token);
+    window.location.href = new URLSearchParams(window.location.search).get('next') || 'index.html';
+  } catch (err) { document.getElementById('errorBox').innerHTML = `<div class="error-box">${escapeHtml(err.message)}</div>`; }
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aliko — Find the exact business, then get there</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="app">
+  <div id="site-header"></div>
+  <main class="shell">
+    <section class="search-hero">
+      <h1>Find the exact <em>shop</em>.<br>Get exact <em>directions</em>.</h1>
+      <p class="page-sub">Building, floor, entrance, and a route that actually gets you there — not just the block.</p>
+      <div class="search-bar-wrap">
+        <div class="search-bar">
+          <span>🔍</span>
+          <input type="text" id="searchInput" placeholder="Search a business, product, building, or landmark…" autocomplete="off">
+          <button class="btn primary small" id="nearMeBtn">Near me</button>
+        </div>
+        <div id="suggestBox" class="suggest-box"></div>
+      </div>
+    </section>
+
+    <div id="trendingWrap"></div>
+
+    <div class="chip-row" id="categoryChips"></div>
+
+    <div class="toolbar-row">
+      <select id="sortSelect">
+        <option value="">Sort: best match</option>
+        <option value="nearest">Nearest</option>
+        <option value="rating">Highest rated</option>
+        <option value="reviews">Most reviewed</option>
+        <option value="newest">Newest</option>
+      </select>
+      <label class="switch-label"><input type="checkbox" id="openNowCheck"> Open now</label>
+      <button class="btn ghost small" id="viewToggleBtn" style="margin-left:auto;">🗺 Map view</button>
+    </div>
+
+    <div class="result-count" id="resultCount"></div>
+    <div class="map-toggle-wrap" id="mapWrap"><div id="resultsMap"></div></div>
+    <div class="directory" id="results"><div class="loading">Loading businesses…</div></div>
+  </main>
+</div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="js/api.js"></script>
+<script src="js/nav.js"></script>
+<script src="js/home.js"></script>
+</body>
+</html>

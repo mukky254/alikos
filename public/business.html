@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0A0C10">
+<title>Business — Aliko</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="app">
+  <div id="site-header"></div>
+  <main class="shell" id="profileMain"><div class="loading">Loading business…</div></main>
+</div>
+
+<!-- Resume-in-progress banner (shown if a nav session to this business was interrupted) -->
+<div id="navResumeBar" class="hidden"></div>
+
+<!-- Full-screen navigation overlay, hidden until "Start navigation" -->
+<div id="navPanel" class="hidden">
+  <div id="navMap"></div>
+
+  <!-- Route preview / overview sheet, shown before turn-by-turn tracking begins -->
+  <div id="navPreview" class="nav-preview hidden">
+    <button class="nav-exit" id="navPreviewCloseBtn">←</button>
+    <div class="nav-preview-sheet">
+      <div class="nav-preview-dest">
+        <div class="nav-dest-dot"></div>
+        <div><strong id="navPreviewName">—</strong><span id="navPreviewAddr"></span></div>
+      </div>
+      <div class="nav-mode-row" id="navModeRow">
+        <button class="nav-mode-btn active" data-mode="driving">🚗 Drive</button>
+        <button class="nav-mode-btn" data-mode="foot">🚶 Walk</button>
+        <button class="nav-stop-btn" id="navAddStopBtn">+ Add a stop</button>
+      </div>
+      <div class="nav-alt-list" id="navAltList"><div class="loading">Finding routes…</div></div>
+      <button class="btn primary block" id="navGoBtn" disabled>Go →</button>
+      <p class="nav-preview-hint" id="navPreviewHint">Tap the map to drop a stop (e.g. where you'll park) before you go.</p>
+    </div>
+  </div>
+
+  <div class="nav-topbar" id="navTopbar">
+    <button class="nav-exit" id="navExitBtn">←</button>
+    <div class="nav-instruction">
+      <div class="nav-instruction-icon" id="navIcon">↑</div>
+      <div class="nav-instruction-text">
+        <div class="nav-instruction-dist" id="navDist">—</div>
+        <div class="nav-instruction-main" id="navMain">Preparing route…</div>
+        <div class="nav-instruction-road" id="navRoad"></div>
+      </div>
+    </div>
+  </div>
+  <div class="nav-next-up hidden" id="navNextUp"><span>Then</span> <strong id="navNextText"></strong></div>
+
+  <div class="nav-gps-pill"><span class="nav-gps-dot" id="navGpsDot"></span><span id="navGpsText">GPS</span><span class="nav-speed" id="navSpeed"></span></div>
+  <div class="nav-banner" id="navBanner"></div>
+
+  <div class="nav-side-controls">
+    <button class="nav-side-btn" id="navHeadingBtn" title="Heading-up / North-up">🧭</button>
+    <button class="nav-side-btn" id="navStyleBtn" title="Map style">🗺️</button>
+    <button class="nav-side-btn" id="navThemeBtn" title="Day / Night">🌙</button>
+    <button class="nav-side-btn" id="navUnitsBtn" title="Units">km</button>
+  </div>
+  <button class="nav-recenter" id="navRecenterBtn">◎</button>
+
+  <div class="nav-bottom">
+    <div class="nav-stats">
+      <div class="nav-stat"><strong id="navRemaining">—</strong><span>Remaining</span></div>
+      <div class="nav-stat"><strong id="navEta">—</strong><span>ETA</span></div>
+      <div class="nav-stat"><strong id="navAccuracy">—</strong><span>GPS</span></div>
+    </div>
+    <div class="nav-dest-row">
+      <div class="nav-dest-dot"></div>
+      <div><strong id="navDestName">—</strong><span id="navDestAddr"></span></div>
+    </div>
+    <div class="nav-actions">
+      <button class="nav-action-btn" id="navMuteBtn">🔇 Voice</button>
+      <button class="nav-action-btn" id="navRepeatBtn">🔁 Repeat</button>
+      <button class="nav-action-btn" id="navShareBtn">↗ Share ETA</button>
+      <button class="nav-action-btn" id="navStopBtn">Exit</button>
+      <button class="nav-action-btn primary" id="navDetailsBtn">Details</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script src="js/api.js"></script>
+<script src="js/nav.js"></script>
+<script src="js/business.js"></script>
+<script src="js/nav3d.js"></script>
+</body>
+</html>

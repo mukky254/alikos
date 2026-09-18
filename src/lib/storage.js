@@ -1,63 +1,141 @@
-// src/lib/storage.js
-// On Vercel, the filesystem is read-only (except /tmp, which is wiped
-// between invocations), so uploaded photos/documents can't live on local
-// disk in production. This module uploads to Vercel Blob when
-// BLOB_READ_WRITE_TOKEN is set (i.e. when deployed on Vercel with Blob
-// enabled, or running locally with that token exported), and falls back to
-// writing into /uploads on local disk otherwise — so `npm start` still works
-// with zero extra setup on your own machine.
-
 const fs = require('fs');
 const path = require('path');
 
+const isVercel = process.env.VERCEL === '1';
 const useBlob = !!process.env.BLOB_READ_WRITE_TOKEN;
+
 const uploadsDir = path.join(__dirname, '..', '..', 'uploads');
 const docsDir = path.join(uploadsDir, 'docs');
-if (!useBlob) {
-  [uploadsDir, docsDir].forEach((d) => { if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true }); });
+
+/*
+ * Vercel's filesystem is read-only.
+ * Local development can use the uploads folder.
+ * Vercel should use Vercel Blob for uploaded files.
+ */
+if (!isVercel) {
+  [uploadsDir, docsDir].forEach((dir) => {
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+  });
 }
 
-/**
- * Saves a multer memory-storage file buffer. Returns the value to store in
- * the database: a full https URL (Blob) or a bare filename (local disk).
- */
 async function saveFile(file, { prefix = 'file', folder = '' } = {}) {
-  const ext = path.extname(file.originalname) || '.bin';
-  const name = `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}${ext}`;
+  if (!file || !file.buffer) {
+    throw new Error('No file was provided.');
+  }
+
+  const ext = path.extname(file.originalname || '') || '.bin';
+
+  const name =
+    `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}${ext}`;
+
+  /*
+   * Production / Vercel:
+   * Use Vercel Blob.
+   */
   if (useBlob) {
     const { put } = require('@vercel/blob');
-    const blob = await put((folder ? folder + '/' : '') + name, file.buffer, {
+
+    const blobPath =
+      `${folder ? folder.replace(/^\/+|\/+$/g, '') + '/' : ''}${name}`;
+
+    const blob = await put(blobPath, file.buffer, {
       access: 'public',
-      contentType: file.mimetype,
+      contentType: file.mimetype || 'application/octet-stream',
     });
-    return blob.url; // full https URL, stored directly in the DB
+
+    return blob.url;
   }
-  const dest = folder === 'docs' ? docsDir : uploadsDir;
-  fs.writeFileSync(path.join(dest, name), file.buffer);
+
+  /*
+   * Vercel without Blob:
+   * Do not attempt to write to /var/task.
+   */
+  if (isVercel) {
+    throw new Error(
+      'File uploads are not configured for this deployment. ' +
+      'Set BLOB_READ_WRITE_TOKEN in Vercel.'
+    );
+  }
+
+  /*
+   * Local development.
+   */
+  const destinationDir = folder === 'docs'
+    ? docsDir
+    : uploadsDir;
+
+  if (!fs.existsSync(destinationDir)) {
+    fs.mkdirSync(destinationDir, { recursive: true });
+  }
+
+  const destination = path.join(destinationDir, name);
+
+  fs.writeFileSync(destination, file.buffer);
+
   return name;
 }
 
-/** True if the stored value is already a full URL (Blob) rather than a bare local filename. */
 function isUrl(value) {
-  return /^https?:\/\//i.test(value || '');
+  return /^https?:\/\//i.test(String(value || ''));
 }
 
-/** Resolves a stored filename/URL to something a browser can load directly. */
 function publicUrl(value, folder = '') {
-  if (isUrl(value)) return value;
+  if (!value) return '';
+
+  if (isUrl(value)) {
+    return value;
+  }
+
   return `/uploads/${folder ? folder + '/' : ''}${value}`;
 }
 
-/** For admin-only files: fetches the bytes server-side so access stays gated behind requireAdmin. */
 async function readFileBytes(value, folder = '') {
-  if (isUrl(value)) {
-    const res = await fetch(value);
-    if (!res.ok) throw new Error('File not found.');
-    return Buffer.from(await res.arrayBuffer());
+  if (!value) {
+    throw new Error('File not found.');
   }
-  const filePath = path.join(folder === 'docs' ? docsDir : uploadsDir, path.basename(value));
-  if (!fs.existsSync(filePath)) throw new Error('File not found.');
+
+  if (isUrl(value)) {
+    const response = await fetch(value);
+
+    if (!response.ok) {
+      throw new Error('File not found.');
+    }
+
+    return Buffer.from(await response.arrayBuffer());
+  }
+
+  /*
+   * Local development only.
+   */
+  if (isVercel) {
+    throw new Error(
+      'Local file storage is unavailable on Vercel. ' +
+      'Files must be stored using Vercel Blob.'
+    );
+  }
+
+  const safeName = path.basename(value);
+
+  const filePath = path.join(
+    folder === 'docs' ? docsDir : uploadsDir,
+    safeName
+  );
+
+  if (!fs.existsSync(filePath)) {
+    throw new Error('File not found.');
+  }
+
   return fs.readFileSync(filePath);
 }
 
-module.exports = { saveFile, isUrl, publicUrl, readFileBytes, useBlob, uploadsDir, docsDir };
+module.exports = {
+  saveFile,
+  isUrl,
+  publicUrl,
+  readFileBytes,
+  useBlob,
+  uploadsDir,
+  docsDir,
+};

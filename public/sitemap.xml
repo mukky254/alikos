@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>/index.html</loc><priority>1.0</priority></url>
+  <url><loc>/deals.html</loc><priority>0.7</priority></url>
+  <url><loc>/register.html</loc><priority>0.5</priority></url>
+  <url><loc>/login.html</loc><priority>0.3</priority></url>
+  <url><loc>/signup.html</loc><priority>0.3</priority></url>
+</urlset>
+<!-- Note: individual /business.html?id=N pages aren't listed here since
+     they're dynamic and database-driven. For full SEO coverage, generate
+     this file server-side from the businesses table (loop all verified
+     businesses, one <url> each) — that's a backend job, not a static file,
+     so it's intentionally left as a next step rather than faked here. -->

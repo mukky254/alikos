@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Sign up — Aliko</title><link rel="stylesheet" href="css/style.css"><link rel="stylesheet" href="css/shared.css"><link rel="manifest" href="manifest.json"></head>
+<body>
+<div id="app">
+  <div id="site-header"></div>
+  <main class="shell narrow">
+    <div class="card auth-card">
+      <h2 style="margin-bottom:16px;">Create your account</h2>
+      <div id="errorBox"></div>
+      <form id="signupForm">
+        <div class="field"><label>Full name</label><input required type="text" id="name"></div>
+        <div class="field"><label>Email</label><input required type="email" id="email"></div>
+        <div class="field"><label>Password</label><input required type="password" id="password" minlength="6"></div>
+        <button class="btn primary block" type="submit">Sign up</button>
+      </form>
+      <p class="page-sub" style="margin-top:16px;">Already have an account? <a href="login.html" style="text-decoration:underline;">Log in</a></p>
+    </div>
+  </main>
+</div>
+<script src="js/api.js"></script>
+<script src="js/shared.js"></script>
+<script src="js/nav.js"></script>
+<script>
+renderNav('signup');
+document.getElementById('signupForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  try {
+    const { token } = await api('/auth/signup', { method: 'POST', body: { name: document.getElementById('name').value.trim(), email: document.getElementById('email').value.trim(), password: document.getElementById('password').value } });
+    setToken(token);
+    window.location.href = 'index.html';
+  } catch (err) { document.getElementById('errorBox').innerHTML = `<div class="error-box">${escapeHtml(err.message)}</div>`; }
+});
+</script>
+</body>
+</html>

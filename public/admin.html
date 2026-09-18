@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Admin — Aliko</title><link rel="stylesheet" href="css/style.css"><link rel="stylesheet" href="css/shared.css"><link rel="manifest" href="manifest.json"></head>
+<body>
+<div id="app">
+  <div id="site-header"></div>
+  <main class="shell">
+    <h1 class="page-title">Admin dashboard</h1>
+    <p class="page-sub">Only your admin account can see this — enforced server-side on every request.</p>
+    <div class="stat-grid" id="adminStats"></div>
+    <div class="chip-row" id="adminTabs">
+      <button class="chip active" data-tab="pending">Pending</button>
+      <button class="chip" data-tab="all">All businesses</button>
+      <button class="chip" data-tab="reports">Reports</button>
+      <button class="chip" data-tab="claims">Claims</button>
+      <button class="chip" data-tab="documents">Documents</button>
+      <button class="chip" data-tab="analytics">Analytics</button>
+      <button class="chip" data-tab="audit">Audit log</button>
+      <button class="chip" data-tab="import">Bulk import</button>
+      <button class="chip" data-tab="users">Users</button>
+    </div>
+    <div class="card" id="tab-pending"><h3>Pending verification</h3><div id="adminPending"><div class="loading">Loading…</div></div></div>
+    <div class="card hidden" id="tab-all"><h3>All businesses</h3><div id="adminAll"></div></div>
+    <div class="card hidden" id="tab-reports"><h3>Open reports</h3><div id="adminReports"></div></div>
+    <div class="card hidden" id="tab-claims"><h3>Pending claims</h3><div id="adminClaims"></div></div>
+    <div class="card hidden" id="tab-documents"><h3>Pending documents</h3><div id="adminDocuments"></div></div>
+    <div class="card hidden" id="tab-analytics"><h3>By category</h3><div id="chartCategory"></div><h3 style="margin-top:20px;">New listings — 14 days</h3><div id="chartGrowth"></div></div>
+    <div class="card hidden" id="tab-audit"><h3>Audit log</h3><div id="adminAudit"></div></div>
+    <div class="card hidden" id="tab-import">
+      <h3>Bulk import (CSV)</h3>
+      <p class="page-sub" style="margin:0 0 12px;">Header row: name, category, phone, lat, lng, building (floor, shop, entrance, landmark, whatsapp, email optional).</p>
+      <form id="importForm"><div class="field"><label>CSV file</label><input type="file" id="importFile" accept=".csv" required></div><button class="btn primary" type="submit">Import</button></form>
+      <div id="importResult"></div>
+    </div>
+    <div class="card hidden" id="tab-users"><h3>Users</h3><div id="adminUsers"></div></div>
+  </main>
+</div>
+<script src="js/api.js"></script>
+<script src="js/shared.js"></script>
+<script src="js/nav.js"></script>
+<script src="js/admin.js"></script>
+</body>
+</html>

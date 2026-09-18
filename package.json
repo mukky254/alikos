@@ -1,0 +1,23 @@
+{
+  "name": "aliko",
+  "version": "1.0.0",
+  "description": "Aliko - the platform that helps people find the exact business (MVP: Express + SQLite backend, multi-page frontend)",
+  "private": true,
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "seed": "node src/seed.js",
+    "dev": "node src/server.js",
+    "check": "node --check src/server.js && node --check src/routes/directions.js && node --check public/js/api.js && node --check public/js/nav.js && node --check public/js/home.js && node --check public/js/business.js"
+  },
+  "dependencies": {
+    "@vercel/blob": "^2.8.0",
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "jsonwebtoken": "^9.0.2",
+    "multer": "^2.0.0",
+    "pg": "^8.13.0"
+  }
+}

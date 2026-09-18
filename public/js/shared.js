@@ -207,9 +207,23 @@ function skeletonCards(n) {
   return Array.from({ length: n || 4 }).map(() => '<div class="skeleton-card"><div class="sk-line w60"></div><div class="sk-line w40"></div><div class="sk-line w80"></div></div>').join('');
 }
 
-/* 19. PWA install prompt capture + button */
+/* 19. PWA install prompt capture + button.
+   Fix: on iOS Safari, `beforeinstallprompt` never fires — there is no such
+   API there — so the button below would just silently never appear,
+   looking like "the install option disappeared" when really it never had
+   a way to show up on that browser. iOS gets its own instructional banner
+   instead, since manual "Add to Home Screen" via the Share sheet is the
+   only install path Apple exposes to web pages. */
 let deferredInstallPrompt = null;
+function isIos() {
+  return /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.MSStream;
+}
+function isStandalone() {
+  return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+}
 function initPwaInstall() {
+  if (isStandalone()) return; // already installed/running as an app — nothing to offer
+
   window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();
     deferredInstallPrompt = e;
@@ -227,6 +241,20 @@ function initPwaInstall() {
   });
   document.body.appendChild(btn);
   window.addEventListener('appinstalled', () => toast('Aliko installed ✓'));
+
+  // iOS gets a dismissible instructional banner instead of a button that
+  // would never do anything, since the browser gives no install event to
+  // hook into there at all.
+  if (isIos() && !localStorage.getItem('aliko_ios_install_dismissed')) {
+    const banner = document.createElement('div');
+    banner.className = 'aliko-ios-install-banner';
+    banner.innerHTML = `<span>Install Aliko: tap <strong>Share</strong> ⬆️ then <strong>"Add to Home Screen"</strong></span><button aria-label="Dismiss">✕</button>`;
+    banner.querySelector('button').addEventListener('click', () => {
+      banner.remove();
+      localStorage.setItem('aliko_ios_install_dismissed', '1');
+    });
+    document.body.appendChild(banner);
+  }
 }
 
 /* 20. Service worker registration — offline app-shell caching */

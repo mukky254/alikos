@@ -67,6 +67,24 @@
 .resume-banner a{ color: var(--route); font-weight: 700; text-decoration: none; }
 .resume-dismiss{ background: none; border: none; color: var(--ink-faint); font-size: 14px; cursor: pointer; }
 
+/* Recently-viewed horizontal strip (multi-item case) */
+.recent-strip-wrap{ margin-bottom: 16px; }
+.recent-strip-title{ font-size: 13px; color: var(--ink-dim); margin-bottom: 8px; }
+.recent-strip{ display: flex; gap: 10px; overflow-x: auto; padding-bottom: 4px; }
+.recent-card{
+  flex: none; width: 140px; background: var(--surface); border-radius: var(--radius); padding: 10px 12px;
+  display: flex; flex-direction: column; gap: 3px; text-decoration: none; font-size: 12px; color: var(--ink-faint);
+}
+.recent-card strong{ color: var(--ink); font-size: 13px; }
+
+/* Add-business floating action button (persistent, Uber/Maps-style CTA) */
+.aliko-fab{
+  position: fixed; right: 18px; bottom: 84px; z-index: 400; width: 52px; height: 52px; border-radius: 50%;
+  background: var(--route); color: #fff; font-size: 24px; border: none; box-shadow: var(--shadow-card);
+  display: flex; align-items: center; justify-content: center; text-decoration: none;
+}
+@media (max-width: 720px){ .aliko-fab{ bottom: 70px; } }
+
 /* Star rating input (progressive enhancement over the <select>) */
 .aliko-star-input{ display: inline-flex; gap: 4px; font-size: 22px; cursor: pointer; }
 .aliko-star-input span{ color: rgba(255,255,255,.2); transition: color .12s ease; }
@@ -80,6 +98,29 @@
 .qr-panel.hidden{ display: none; }
 .qr-panel img{ border-radius: 8px; background: #fff; padding: 8px; }
 .review-photo-preview{ max-width: 120px; max-height: 120px; border-radius: 8px; margin-top: 8px; display: block; }
+
+/* Nearby similar businesses strip */
+.nearby-strip{ display: flex; gap: 10px; overflow-x: auto; padding-bottom: 4px; }
+.nearby-card{
+  flex: none; width: 160px; background: var(--surface); border-radius: var(--radius); padding: 12px;
+  display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; color: var(--ink-dim); text-decoration: none;
+}
+.nearby-card strong{ color: var(--ink); font-size: 13.5px; }
+.stars.small{ color: var(--signal-amber); font-size: 12px; }
+
+/* Closing-soon urgency banner */
+.closing-soon-banner{
+  background: rgba(245,185,66,.12); color: var(--signal-amber); border: 1px solid rgba(245,185,66,.3);
+  border-radius: var(--radius-sm); padding: 8px 12px; font-size: 13px; font-weight: 700; margin-bottom: 10px;
+}
+
+/* Rating breakdown bars */
+.rating-breakdown{ margin-bottom: 16px; display: flex; flex-direction: column; gap: 6px; }
+.rb-row{ display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--ink-dim); }
+.rb-star{ width: 26px; flex: none; }
+.rb-track{ flex: 1; height: 6px; border-radius: 3px; background: rgba(255,255,255,.08); overflow: hidden; }
+.rb-fill{ height: 100%; background: var(--signal-amber); border-radius: 3px; }
+.rb-count{ width: 24px; text-align: right; flex: none; }
 
 /* Focus visibility for keyboard users */
 a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible{

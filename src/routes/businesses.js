@@ -292,6 +292,26 @@ router.put('/:id', requireAuth, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+router.delete('/:id', requireAuth, async (req, res) => {
+  try {
+    const biz = await getOne('SELECT * FROM businesses WHERE id = $1', [req.params.id]);
+    if (!biz) return res.status(404).json({ error: 'Business not found.' });
+    if (biz.owner_id !== req.user.id && req.user.role !== 'admin') return res.status(403).json({ error: 'Only the business owner or an admin can delete this listing.' });
+    // Safety check: the caller must echo the exact business name back, so
+    // this can't be triggered by a stray click — same pattern GitHub/Vercel
+    // use for destructive actions ("type the repo name to delete it").
+    if ((req.body.confirmName || '').trim().toLowerCase() !== biz.name.trim().toLowerCase()) {
+      return res.status(400).json({ error: 'Confirmation name did not match — nothing was deleted.' });
+    }
+    // Every table with a business_id column is declared with
+    // ON DELETE CASCADE (see src/db.js), so this one delete cleans up
+    // photos, reviews, offers, Q&A, claims, saved entries, daily stats,
+    // etc. automatically at the database level.
+    await run('DELETE FROM businesses WHERE id = $1', [req.params.id]);
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 router.post('/:id/photos', requireAuth, uploadPhoto.single('photo'), async (req, res) => {
   try {
     const biz = await getOne('SELECT * FROM businesses WHERE id = $1', [req.params.id]);

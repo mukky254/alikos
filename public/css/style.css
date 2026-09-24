@@ -70,24 +70,63 @@ header.site{
 }
 .site-inner{
   max-width: 1180px; margin: 0 auto;
-  display: flex; align-items: center; gap: 20px;
-  padding: 14px 24px;
+  display: flex; align-items: center; gap: 14px;
+  padding: 12px 20px;
 }
-.brand{ font-family: var(--font-display); font-size: 21px; font-weight: 800; letter-spacing: -0.03em; white-space: nowrap; }
+.brand{ font-family: var(--font-display); font-size: 20px; font-weight: 800; letter-spacing: -0.03em; white-space: nowrap; }
 .brand em{ font-style: normal; color: var(--route); }
-nav.tabs{ display: flex; gap: 2px; overflow-x: auto; scrollbar-width: none; flex: 1; }
-nav.tabs::-webkit-scrollbar{ display: none; }
-nav.tabs a{
-  padding: 8px 13px; border-radius: var(--radius-full);
-  font-size: 13px; font-weight: 600; color: var(--ink-dim);
-  white-space: nowrap; transition: .15s;
-}
-nav.tabs a:hover{ color: var(--ink); background: rgba(255,255,255,.05); }
-nav.tabs a.active{ color: var(--bg); background: var(--ink); }
-.auth-box{ display: flex; align-items: center; gap: 12px; font-size: 13px; white-space: nowrap; }
+.hamburger-btn{ background: none; border: none; color: var(--ink); font-size: 20px; padding: 4px 6px; line-height: 1; }
+.top-login-link{ font-size: 13px; font-weight: 700; color: var(--ink); text-decoration: none; }
+.top-login-link:hover{ color: var(--route); }
+.auth-box{ display: flex; align-items: center; gap: 12px; font-size: 13px; white-space: nowrap; margin-left: auto; }
 .auth-box a, .auth-box button{ border: none; background: none; font-weight: 700; color: var(--ink); }
 .auth-box a:hover, .auth-box button:hover{ color: var(--route); }
 .notif-wrap{ position: relative; }
+
+/* Side drawer — replaces the old full-width top tab row. Every nav
+   destination lives here now, off-screen until opened. */
+.drawer-backdrop{
+  position: fixed; inset: 0; z-index: 899; background: rgba(5,7,10,.6); backdrop-filter: blur(4px);
+  opacity: 1; transition: opacity .25s ease;
+}
+.drawer-backdrop.hidden{ display: none; }
+.side-drawer{
+  position: fixed; top: 0; bottom: 0; left: 0; z-index: 900; width: min(300px, 84vw);
+  background: var(--surface); border-right: 1px solid var(--line);
+  display: flex; flex-direction: column; padding: 16px;
+  transform: translateX(-100%); transition: transform .28s cubic-bezier(.2,.8,.2,1);
+  box-shadow: var(--shadow-float);
+}
+.side-drawer.open{ transform: translateX(0); }
+.drawer-top{ display: flex; align-items: center; justify-content: space-between; padding-bottom: 16px; border-bottom: 1px solid var(--line); margin-bottom: 12px; }
+.drawer-close{ background: none; border: none; color: var(--ink-dim); font-size: 18px; }
+.drawer-links{ display: flex; flex-direction: column; gap: 2px; flex: 1; overflow-y: auto; }
+.drawer-link{
+  display: flex; align-items: center; gap: 12px; padding: 12px 10px; border-radius: var(--radius-sm);
+  font-size: 14.5px; font-weight: 600; color: var(--ink-dim);
+}
+.drawer-link:hover{ background: rgba(255,255,255,.05); color: var(--ink); }
+.drawer-link.active{ background: rgba(255,90,31,.1); color: var(--route); }
+.drawer-icon{ font-size: 16px; width: 22px; text-align: center; }
+.drawer-bottom{ padding-top: 14px; border-top: 1px solid var(--line); margin-top: 10px; }
+.drawer-user{ font-size: 13.5px; margin-bottom: 10px; }
+body.drawer-open{ overflow: hidden; }
+
+/* Uber-style persistent bottom tab bar — phones only (see media query) */
+.bottom-tabs{
+  display: none; position: fixed; left: 0; right: 0; bottom: 0; z-index: 480;
+  background: rgba(10,12,16,.96); backdrop-filter: blur(18px);
+  border-top: 1px solid var(--line);
+  padding: 6px 4px calc(6px + env(safe-area-inset-bottom));
+  justify-content: space-around;
+}
+.bottom-tab{
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  background: none; border: none; color: var(--ink-faint); font-size: 10.5px; font-weight: 600; padding: 4px 6px;
+}
+.bottom-tab span{ font-size: 18px; }
+.bottom-tab.active{ color: var(--route); }
+
 .notif-bell{
   width: 36px; height: 36px; border-radius: var(--radius-sm);
   border: 1px solid var(--line); background: var(--surface); color: var(--ink);
@@ -400,6 +439,23 @@ body.nav-open{ overflow: hidden; }
 .arrival-grid{ display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 20px 0; text-align: left; }
 .arrival-grid > div{ background: var(--bg-raised); border-radius: var(--radius-sm); padding: 10px 12px; }
 
+/* In-navigation arrival state: a bottom sheet, not a full-screen veil, so
+   the live map (and your position on it) stays visible behind it. */
+.nav-arrival-sheet-overlay{
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 6000;
+  display: flex; justify-content: center; pointer-events: none;
+}
+.nav-arrival-sheet-overlay .nav-arrival-sheet{ pointer-events: auto; }
+.nav-arrival-sheet{
+  width: min(480px, 100%); background: var(--surface-2); border-radius: 20px 20px 0 0;
+  padding: 22px 24px calc(22px + env(safe-area-inset-bottom)); text-align: center;
+  box-shadow: 0 -14px 44px rgba(0,0,0,.55); border-top: 1px solid rgba(255,255,255,.08);
+  animation: navArrivalUp .32s cubic-bezier(.2,.8,.2,1);
+}
+@keyframes navArrivalUp{ from{ transform: translateY(100%); } to{ transform: translateY(0); } }
+.arrival-rate-row{ display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 16px 0; font-size: 13px; color: var(--ink-dim); }
+.arrival-rate-row .aliko-star-input{ font-size: 20px; }
+
 .stat-grid{ display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin-bottom: 20px; }
 .stat-card{ background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; }
 .stat-num{ font-family: var(--font-display); font-size: 24px; font-weight: 800; }
@@ -423,8 +479,55 @@ select.owner-select{ max-width: 300px; margin-bottom: 18px; }
 .leaflet-control-zoom a{ background: var(--surface) !important; color: #fff !important; border-color: var(--line) !important; }
 
 @media (max-width: 720px){
-  .site-inner{ padding: 12px 16px; }
-  main.shell{ padding: 22px 16px 90px; }
+  .site-inner{ padding: 10px 14px; }
+  main.shell{ padding: 18px 14px 96px; } /* extra bottom padding clears the bottom tab bar */
   .address-plate{ grid-template-columns: repeat(2, 1fr); }
-  .profile-name{ font-size: 26px; }
+  .profile-name{ font-size: 22px; }
+
+  /* Fix: category chips no longer wrap into several tall rows — they
+     scroll horizontally in one row instead, the same pattern Uber Eats/
+     Google/most apps use for a category strip on a phone. */
+  .chip-row{ flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; margin-bottom: 12px; }
+  .chip-row::-webkit-scrollbar{ display: none; }
+  .chip{ flex: none; }
+
+  .toolbar-row{ gap: 8px; margin: 12px 0 4px; }
+  .toolbar-row select, .toolbar-row .btn{ font-size: 12px; padding: 7px 10px; }
+  #clearFiltersBtn{ order: 3; } /* keep Map view pinned right, Clear filters wraps under the select/checkbox */
+
+  .action-row{ gap: 6px; }
+  .action-row .btn{ padding: 9px 12px; font-size: 12.5px; }
+  .profile-top{ gap: 10px; }
+  .stat-grid{ grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .stat-card{ padding: 10px; }
+  .admin-row{ flex-direction: column; align-items: stretch; }
+  .admin-row > div:last-child{ justify-content: flex-start; }
+
+  /* Uber-style bottom tab bar takes over the primary navigation role on
+     phones; the drawer becomes the "More" overflow. */
+  .bottom-tabs{ display: flex; }
+}
+
+@media (max-width: 380px){
+  /* Extra-small phones (iPhone SE and similar) — tighten further rather
+     than letting cards/buttons overflow or wrap awkwardly. */
+  .site-inner{ padding: 8px 10px; gap: 8px; }
+  .brand{ font-size: 17px; }
+  main.shell{ padding: 14px 10px 96px; }
+  .profile-name{ font-size: 19px; }
+  h1{ font-size: 21px; } h2{ font-size: 17px; }
+  .card{ padding: 14px; }
+  .stat-grid{ grid-template-columns: repeat(2, 1fr); gap: 6px; }
+  .action-row .btn{ padding: 8px 10px; font-size: 12px; }
+  .bottom-tab{ font-size: 9.5px; }
+  .bottom-tab span{ font-size: 16px; }
+}
+
+/* Native date/time inputs (business hours form) default to the OS's
+   light-mode widget regardless of page theme unless told otherwise —
+   this was the "hours showing white/unclear" bug on the dashboard. */
+:root{ color-scheme: dark; }
+input[type="time"], input[type="date"]{
+  background: var(--surface-2); color: var(--ink); border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm); padding: 8px 10px; color-scheme: dark;
 }

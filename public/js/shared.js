@@ -274,17 +274,34 @@ function embedCodeFor(businessId, name) {
   return `<a href="${url}" style="display:inline-block;padding:10px 16px;background:#FF5A1F;color:#fff;border-radius:8px;font-family:sans-serif;text-decoration:none;font-weight:700;">📍 Find ${(name || 'us').replace(/"/g, '')} on Aliko</a>`;
 }
 
-/* 23. Session-based "continue where you left off" resume banner (home page only) */
+/* 23. Session-based "continue where you left off" resume banner, or a
+   horizontal recently-viewed strip (Uber-style "past trips" row) when
+   there's more than one recent business — home page only. */
 function initResumeBanner() {
   const mount = document.getElementById('resumeBannerMount');
   if (!mount) return;
   try {
     const recent = JSON.parse(localStorage.getItem('aliko_recent') || '[]');
     if (!recent.length) return;
-    const last = recent[0];
-    mount.innerHTML = `<div class="resume-banner">Continue where you left off — <a href="business.html?id=${last.id}">${escapeHtml(last.name)}</a><button class="resume-dismiss" aria-label="Dismiss">✕</button></div>`;
-    mount.querySelector('.resume-dismiss').addEventListener('click', () => { mount.innerHTML = ''; });
+    if (recent.length === 1) {
+      const last = recent[0];
+      mount.innerHTML = `<div class="resume-banner">Continue where you left off — <a href="business.html?id=${last.id}">${escapeHtml(last.name)}</a><button class="resume-dismiss" aria-label="Dismiss">✕</button></div>`;
+      mount.querySelector('.resume-dismiss').addEventListener('click', () => { mount.innerHTML = ''; });
+      return;
+    }
+    mount.innerHTML = `<div class="recent-strip-wrap"><h3 class="recent-strip-title">Recently viewed</h3>
+      <div class="recent-strip">${recent.slice(0, 8).map((b) => `<a class="recent-card" href="business.html?id=${b.id}"><strong>${escapeHtml(b.name)}</strong><span>${escapeHtml(b.category || '')}</span></a>`).join('')}</div></div>`;
   } catch (e) {}
+}
+
+/* 24. Persistent "Add business" floating action button on the Discover page */
+function initAddBusinessFab() {
+  if (!document.getElementById('resultsMap') && !document.getElementById('searchInput')) return; // Discover page only
+  const user = typeof getUser === 'function' ? getUser() : null;
+  const fab = document.createElement('a');
+  fab.className = 'aliko-fab'; fab.title = 'List a business'; fab.textContent = '+';
+  fab.href = user ? 'register.html' : 'login.html?next=register.html';
+  document.body.appendChild(fab);
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -296,4 +313,5 @@ document.addEventListener('DOMContentLoaded', () => {
   initServiceWorker();
   initPasswordToggles();
   initResumeBanner();
+  initAddBusinessFab();
 });

@@ -14,6 +14,7 @@ const DAY_LABELS = { mon: 'Mon', tue: 'Tue', wed: 'Wed', thu: 'Thu', fri: 'Fri',
 
 async function load() {
   if (!bizId) { document.getElementById('profileMain').innerHTML = '<div class="empty">No business selected.</div>'; return; }
+  document.getElementById('profileMain').innerHTML = skeletonCards(3); // Feature: skeleton loader instead of a blank pane while the profile loads
   try {
     const { business } = await api('/businesses/' + bizId);
     currentBusiness_forNav = business;
@@ -25,9 +26,31 @@ async function load() {
     render(business);
     initProfileMap(business);
     loadQA(business.id);
+    loadNearby(business);
   } catch (e) {
     document.getElementById('profileMain').innerHTML = `<div class="error-box">${escapeHtml(e.message)}</div>`;
   }
+}
+
+// Feature: nearby similar businesses (same category), like the "you might
+// also like" row on Uber Eats or Amazon — reuses the existing search
+// endpoint, no new backend work.
+async function loadNearby(b) {
+  const mount = document.getElementById('nearbyMount');
+  if (!mount) return;
+  try {
+    const params = new URLSearchParams({ category: b.category, lat: b.lat, lng: b.lng, sort: 'nearest' });
+    const { businesses } = await api('/businesses?' + params.toString());
+    const others = businesses.filter((x) => x.id !== b.id).slice(0, 6);
+    if (!others.length) return;
+    mount.innerHTML = `<h3 style="margin-bottom:10px;">More in ${escapeHtml(b.category)}</h3>
+      <div class="nearby-strip">${others.map((o) => `
+        <a class="nearby-card" href="business.html?id=${o.id}">
+          <strong>${escapeHtml(o.name)}</strong>
+          <span class="muted">${o.distanceKm != null ? o.distanceKm.toFixed(1) + ' km' : escapeHtml(o.building || '')}</span>
+          ${o.avgRating ? `<span class="stars small">★ ${o.avgRating}</span>` : ''}
+        </a>`).join('')}</div>`;
+  } catch (e) {}
 }
 
 function rememberRecentlyViewed(b) {
@@ -48,6 +71,34 @@ function tierBadge(b) {
 function hoursTable(hours) {
   if (!hours) return '<p class="muted" style="margin:0;">Hours not provided yet.</p>';
   return Object.keys(DAY_LABELS).map((d) => `<div class="hours-row"><span class="muted">${DAY_LABELS[d]}</span><span>${hours[d] ? escapeHtml(hours[d][0]) + ' – ' + escapeHtml(hours[d][1]) : 'Closed'}</span></div>`).join('');
+}
+
+// Feature: "closing soon" warning — Uber/food-delivery apps flag urgency
+// like this ("last orders in 20 min"); a plain OPEN/CLOSED badge doesn't
+// tell you that you're about to be too late.
+const DOW_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+function closingSoonBanner(b) {
+  if (!b.hours || b.openNow !== true) return '';
+  const now = new Date();
+  const today = b.hours[DOW_KEYS[now.getDay()]];
+  if (!today) return '';
+  const [, endStr] = today;
+  const [eh, em] = endStr.split(':').map(Number);
+  const end = new Date(now); end.setHours(eh, em, 0, 0);
+  const minsLeft = Math.round((end - now) / 60000);
+  if (minsLeft > 0 && minsLeft <= 30) return `<div class="closing-soon-banner">⏰ Closing in ${minsLeft} min</div>`;
+  return '';
+}
+
+// Feature: rating breakdown bars (5★ down to 1★), like Uber driver
+// ratings or Amazon reviews — computed client-side from the reviews
+// already loaded, no extra request needed.
+function ratingBreakdown(reviews) {
+  const counts = [0, 0, 0, 0, 0]; // index 0 = 5 star ... index 4 = 1 star
+  reviews.forEach((r) => { const i = 5 - Math.round(r.rating); if (counts[i] !== undefined) counts[i]++; });
+  const total = reviews.length;
+  return `<div class="rating-breakdown">${counts.map((c, i) => `
+    <div class="rb-row"><span class="rb-star">${5 - i}★</span><div class="rb-track"><div class="rb-fill" style="width:${total ? (c / total) * 100 : 0}%;"></div></div><span class="rb-count">${c}</span></div>`).join('')}</div>`;
 }
 
 /* ============================= RENDER ============================= */
@@ -133,7 +184,7 @@ function render(b) {
         : '<div class="photo-card" style="display:flex;align-items:center;justify-content:center;color:var(--ink-faint);font-size:12px;">No photos yet</div>'}
     </div>
 
-    <div class="card"><h3>🕒 Opening hours</h3>${hoursTable(b.hours)}</div>
+    <div class="card"><h3>🕒 Opening hours</h3>${closingSoonBanner(b)}${hoursTable(b.hours)}</div>
 
     <div class="card">
       <h3>Location confidence</h3>
@@ -153,6 +204,7 @@ function render(b) {
 
     <div class="card">
       <h3>Reviews</h3>
+      ${b.reviews && b.reviews.length ? ratingBreakdown(b.reviews) : ''}
       ${b.reviews && b.reviews.length ? b.reviews.map((r) => `
         <div class="review" data-review-id="${r.id}">
           <div class="review-top"><span>${escapeHtml(r.user_name)} <span class="review-date">${new Date(r.created_at * 1000).toLocaleDateString()}</span></span><span class="stars">${'★'.repeat(r.rating)}${'☆'.repeat(5 - r.rating)}</span></div>
@@ -175,6 +227,8 @@ function render(b) {
           <button class="btn" type="submit">Post review</button>
         </form>` : `<p class="note">Please <a href="login.html?next=business.html%3Fid%3D${b.id}" style="text-decoration:underline;">log in</a> to leave a review.</p>`}
     </div>
+
+    <div id="nearbyMount"></div>
 
     <div class="card">
       <h3>Questions &amp; Answers</h3>
@@ -1457,9 +1511,14 @@ function handleArrival() {
 function showArrivalCard(b, arrived) {
   let card = document.getElementById('arrivalCard');
   if (!card) { card = document.createElement('div'); card.id = 'arrivalCard'; document.body.appendChild(card); }
-  card.className = 'arrival-overlay';
+  // Fix: this used to be a full-screen dark/blurred overlay that completely
+  // hid the live map right when arriving — the moment someone most needs
+  // to see their position relative to the destination (exact shop/floor).
+  // It's now a bottom sheet: the map stays visible above it, closer to how
+  // Uber/Google Maps present an arrival state.
+  card.className = 'nav-arrival-sheet-overlay';
   card.innerHTML = `
-    <div class="arrival-card">
+    <div class="nav-arrival-sheet">
       <div class="arrival-check">${arrived ? '✓' : '📍'}</div>
       <div class="arrival-title">${arrived ? 'You have arrived' : 'Exact destination'}</div>
       <div class="arrival-sub">${escapeHtml(b.name)}</div>
@@ -1469,9 +1528,29 @@ function showArrivalCard(b, arrived) {
         <div><div class="addr-label">Floor</div><div class="addr-val small">${escapeHtml(b.floor || 'Not provided')}</div></div>
         <div><div class="addr-label">Shop</div><div class="addr-val small">${escapeHtml(b.shop || 'Not provided')}</div></div>
       </div>
+      ${arrived ? `<div class="arrival-rate-row"><span>How was getting here?</span><div class="aliko-star-input" id="arrivalStars">${[5,4,3,2,1].map((n)=>`<span data-val="${n}">★</span>`).join('')}</div></div>` : ''}
       <button class="btn primary block" id="arrivalCloseBtn">${arrived ? 'Done' : 'Continue navigation'}</button>
     </div>`;
   document.getElementById('arrivalCloseBtn').onclick = () => { card.className = 'hidden'; if (arrived) exitNavigation(); };
+  // Feature: post-arrival rating prompt (Uber-style "rate your trip"),
+  // pre-fills the star value and jumps straight to the review form.
+  const starsWrap = document.getElementById('arrivalStars');
+  if (starsWrap) {
+    starsWrap.querySelectorAll('span').forEach((s) => s.addEventListener('click', () => {
+      card.className = 'hidden';
+      exitNavigation();
+      const ratingSelect = document.getElementById('rv-rating');
+      const reviewForm = document.getElementById('reviewForm');
+      if (ratingSelect && reviewForm) {
+        ratingSelect.value = s.dataset.val;
+        const starInput = reviewForm.querySelector('.aliko-star-input');
+        if (starInput) starInput.querySelectorAll('span').forEach((st) => st.classList.toggle('filled', Number(st.dataset.val) <= Number(s.dataset.val)));
+        reviewForm.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        const textEl = document.getElementById('rv-text');
+        if (textEl) textEl.focus();
+      }
+    }));
+  }
 }
 
 function exitNavigation() {

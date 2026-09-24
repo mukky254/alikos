@@ -29,7 +29,7 @@ function paint() {
     <div class="card">
       <h3>${escapeHtml(b.name)} ${b.verified ? '<span class="badge verified">VERIFIED</span>' : '<span class="badge pending">PENDING</span>'}</h3>
       <p class="muted" style="margin:4px 0 0;">${escapeHtml(b.building)} · Floor ${escapeHtml(b.floor || '—')} · Shop ${escapeHtml(b.shop || '—')}</p>
-      <p style="margin:10px 0 0;display:flex;gap:16px;"><a href="business.html?id=${b.id}" style="text-decoration:underline;">View profile →</a><button class="btn small ghost" id="exportCsvBtn">Download CSV</button></p>
+      <p style="margin:10px 0 0;display:flex;gap:16px;flex-wrap:wrap;"><a href="business.html?id=${b.id}" style="text-decoration:underline;">View profile →</a><button class="btn small ghost" id="exportCsvBtn">Download CSV</button><button class="btn small danger" id="deleteBizBtn" style="margin-left:auto;">🗑 Delete business</button></p>
     </div>
     <div class="stat-grid">
       <div class="stat-card"><div class="stat-num">${b.views}</div><div class="stat-label">Views</div></div>
@@ -117,6 +117,37 @@ function wireForms(b) {
     } catch (e) { toast(e.message); }
   });
 
+  // Feature: delete business. Requires typing the exact business name to
+  // confirm — same pattern GitHub/Vercel use for destructive actions — so
+  // this can never fire from a stray tap. The backend endpoint cascades
+  // the delete across photos/reviews/offers/etc. automatically.
+  document.getElementById('deleteBizBtn').addEventListener('click', () => {
+    const overlay = document.createElement('div');
+    overlay.className = 'arrival-overlay';
+    overlay.innerHTML = `
+      <div class="arrival-card" style="text-align:left;">
+        <div class="arrival-title" style="color:var(--signal-red);">Delete "${escapeHtml(b.name)}"?</div>
+        <p class="muted" style="margin:10px 0;">This permanently deletes the listing, its photos, reviews, offers, and analytics. This can't be undone.</p>
+        <p style="font-size:12.5px;color:var(--ink-dim);margin-bottom:6px;">Type the business name to confirm:</p>
+        <div class="field" style="margin-bottom:14px;"><input type="text" id="deleteConfirmInput" placeholder="${escapeHtml(b.name)}"></div>
+        <div style="display:flex;gap:10px;">
+          <button class="btn ghost block" id="deleteCancelBtn">Cancel</button>
+          <button class="btn danger block" id="deleteConfirmBtn">Delete permanently</button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+    overlay.querySelector('#deleteCancelBtn').addEventListener('click', () => overlay.remove());
+    overlay.querySelector('#deleteConfirmBtn').addEventListener('click', async () => {
+      const typed = overlay.querySelector('#deleteConfirmInput').value;
+      try {
+        await api('/businesses/' + b.id, { method: 'DELETE', body: { confirmName: typed } });
+        toast('Business deleted.');
+        overlay.remove();
+        window.location.reload();
+      } catch (e) { toast(e.message); }
+    });
+  });
+
   document.getElementById('editForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     try {
@@ -188,9 +219,22 @@ async function loadTrend(businessId) {
   const el = document.getElementById('trendChart');
   try {
     const { days } = await api('/businesses/' + businessId + '/stats-daily');
+    // Fix: days with zero activity simply have no row in stats_daily, so
+    // the raw array silently skips them — a business with views on only
+    // 4 of the last 14 days would render 4 bars, not 14, which visually
+    // compresses the timeline and misrepresents which days are adjacent.
+    // Fill every calendar day in the window explicitly, zero-filled.
+    const byDay = {};
+    days.forEach((d) => { byDay[d.day] = d; });
+    const filled = [];
+    for (let i = 13; i >= 0; i--) {
+      const d = new Date(); d.setDate(d.getDate() - i);
+      const key = d.toISOString().slice(0, 10);
+      filled.push(byDay[key] || { day: key, views: 0, navigations: 0, calls: 0, whatsapp_clicks: 0 });
+    }
     if (!days.length) { el.innerHTML = '<p class="muted" style="margin:0;">No traffic data yet.</p>'; return; }
-    const max = Math.max(...days.map((d) => d.views), 1);
-    el.innerHTML = `<div class="trend-bars">${days.map((d) => `<div title="${d.day}: ${d.views} views" style="height:${Math.max(4, (d.views / max) * 100)}%;"></div>`).join('')}</div>`;
+    const max = Math.max(...filled.map((d) => d.views), 1);
+    el.innerHTML = `<div class="trend-bars">${filled.map((d) => `<div title="${d.day}: ${d.views} views" style="height:${Math.max(4, (d.views / max) * 100)}%;"></div>`).join('')}</div>`;
   } catch (e) { el.innerHTML = `<div class="error-box">${escapeHtml(e.message)}</div>`; }
 }
 

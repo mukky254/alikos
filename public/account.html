@@ -7,6 +7,17 @@
   <main class="shell narrow">
     <h1 class="page-title">Account settings</h1>
     <div class="card">
+      <h3>🔗 Your Aliko link</h3>
+      <p class="muted" style="font-size:12.5px;margin-bottom:10px;">Share this on social media to send people straight to your business — if you have just one listing, it takes them right there.</p>
+      <div class="field" style="display:flex;gap:8px;align-items:center;">
+        <input id="myLinkInput" readonly style="flex:1;">
+        <button class="btn ghost" id="copyMyLinkBtn">📋 Copy</button>
+        <button class="btn ghost" id="shareMyLinkBtn">🔗 Share</button>
+      </div>
+      <div class="qr-panel hidden" id="myLinkQrPanel"></div>
+      <button class="btn ghost small" id="myLinkQrBtn" style="margin-top:10px;">▦ Show QR code</button>
+    </div>
+    <div class="card">
       <h3>Profile</h3>
       <div id="profileError"></div>
       <form id="profileForm">
@@ -33,6 +44,20 @@
 renderNav('account');
 const user = requireLogin();
 if (user) { document.getElementById('p-name').value = user.name; document.getElementById('p-email').value = user.email; }
+
+// Feature: personal shareable link ("find me on Aliko").
+if (user) {
+  const myLink = window.location.origin + '/profile.html?id=' + user.id;
+  document.getElementById('myLinkInput').value = myLink;
+  document.getElementById('copyMyLinkBtn').addEventListener('click', () => copyToClipboard(myLink, 'Your link'));
+  document.getElementById('shareMyLinkBtn').addEventListener('click', () => shareOrCopy({ title: 'Find me on Aliko', url: myLink }));
+  document.getElementById('myLinkQrBtn').addEventListener('click', () => {
+    const panel = document.getElementById('myLinkQrPanel');
+    if (!panel.classList.contains('hidden')) { panel.classList.add('hidden'); return; }
+    panel.innerHTML = `<img src="${qrCodeUrl(myLink)}" alt="QR code for your Aliko link" width="180" height="180">`;
+    panel.classList.remove('hidden');
+  });
+}
 document.getElementById('profileForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   try { const { token } = await api('/auth/me', { method: 'PUT', body: { name: document.getElementById('p-name').value.trim() } }); setToken(token); toast('Name updated.'); renderNav('account'); }

@@ -104,7 +104,12 @@ function ratingBreakdown(reviews) {
 /* ============================= RENDER ============================= */
 
 function render(b) {
-  const waNum = (b.whatsapp || '').replace(/[^0-9]/g, '');
+  // Fix: call/WhatsApp links normalized to real international format —
+  // previously used whatever was typed verbatim, which silently failed
+  // for WhatsApp (wa.me requires a country code, no leading zero) on any
+  // number saved before the country-code fields existed.
+  const phoneLink = normalizePhoneForLink(b.phone);
+  const waNum = normalizePhoneForLink(b.whatsapp).replace(/[^0-9]/g, '');
   const user = getUser();
   const isOwner = user && user.id === b.owner_id;
   const pageUrl = window.location.origin + '/business.html?id=' + b.id;
@@ -150,7 +155,7 @@ function render(b) {
     ${b.brand ? `<p class="note">Part of <strong>${escapeHtml(b.brand.name)}</strong>${b.otherLocations && b.otherLocations.length ? ' — also at: ' + b.otherLocations.map((l) => escapeHtml(l.name) + ' (' + escapeHtml(l.building) + ')').join(', ') : ''}</p>` : ''}
 
     <div class="action-row">
-      <a class="btn" href="tel:${escapeHtml(b.phone || '')}">📞 Call</a>
+      <a class="btn" href="tel:${escapeHtml(phoneLink)}">📞 Call</a>
       ${waNum ? `<a class="btn" href="https://wa.me/${waNum}" target="_blank" rel="noopener">💬 WhatsApp</a>` : ''}
       ${b.phone ? `<button class="btn ghost" id="copyPhoneBtn">📋 Copy phone</button>` : ''}
       <button class="btn ghost" id="copyAddrBtn">📋 Copy address</button>
@@ -262,7 +267,7 @@ function wireActions(b, user, isOwner) {
   document.getElementById('copyAddrBtn').addEventListener('click', () => {
     copyToClipboard([b.building, b.floor ? 'Floor ' + b.floor : '', b.shop ? 'Shop ' + b.shop : ''].filter(Boolean).join(', '), 'Address');
   });
-  if (document.getElementById('copyPhoneBtn')) document.getElementById('copyPhoneBtn').addEventListener('click', () => copyToClipboard(b.phone, 'Phone number'));
+  if (document.getElementById('copyPhoneBtn')) document.getElementById('copyPhoneBtn').addEventListener('click', () => copyToClipboard(normalizePhoneForLink(b.phone), 'Phone number'));
   document.getElementById('copyLinkBtn').addEventListener('click', () => copyToClipboard(window.location.href, 'Link'));
   document.getElementById('printBtn').addEventListener('click', printPage);
 

@@ -5,7 +5,7 @@
 const CACHE_NAME = 'aliko-shell-v1';
 const SHELL_FILES = [
   '/index.html', '/business.html', '/saved.html', '/deals.html', '/dashboard.html',
-  '/account.html', '/login.html', '/signup.html', '/register.html',
+  '/account.html', '/login.html', '/signup.html', '/register.html', '/profile.html',
   '/css/style.css', '/css/shared.css',
   '/js/api.js', '/js/nav.js', '/js/shared.js', '/js/home.js',
   '/manifest.json',

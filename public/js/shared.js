@@ -304,6 +304,77 @@ function initAddBusinessFab() {
   document.body.appendChild(fab);
 }
 
+/* 25. Phone/WhatsApp country-code handling.
+   Fix: tel:/wa.me links were built directly from whatever text a business
+   owner typed (often a local format like "0712345678"), which wa.me
+   silently rejects or misroutes — it requires a full international
+   number with country code and no leading zero. This provides a proper
+   country-code selector for forms, and a normalizer used everywhere a
+   phone number is turned into a tel:/wa.me link, so both new entries and
+   existing legacy numbers resolve correctly. */
+const ALIKO_COUNTRY_CODES = [
+  { cc: '254', label: '🇰🇪 Kenya +254' },
+  { cc: '234', label: '🇳🇬 Nigeria +234' },
+  { cc: '255', label: '🇹🇿 Tanzania +255' },
+  { cc: '256', label: '🇺🇬 Uganda +256' },
+  { cc: '233', label: '🇬🇭 Ghana +233' },
+  { cc: '27', label: '🇿🇦 South Africa +27' },
+  { cc: '251', label: '🇪🇹 Ethiopia +251' },
+  { cc: '250', label: '🇷🇼 Rwanda +250' },
+  { cc: '20', label: '🇪🇬 Egypt +20' },
+  { cc: '1', label: '🇺🇸/🇨🇦 US/Canada +1' },
+  { cc: '44', label: '🇬🇧 UK +44' },
+  { cc: '91', label: '🇮🇳 India +91' },
+  { cc: 'other', label: 'Other (type full number with +)' },
+];
+
+function countryPhoneFieldHTML(idPrefix, labelText, existingValue) {
+  const { cc, local } = splitE164(existingValue);
+  const options = ALIKO_COUNTRY_CODES.map((c) => `<option value="${c.cc}" ${cc === c.cc ? 'selected' : ''}>${c.label}</option>`).join('');
+  return `<div class="field"><label>${labelText}</label><div class="phone-field-row">
+    <select id="${idPrefix}-cc" class="phone-cc-select">${options}</select>
+    <input id="${idPrefix}-local" placeholder="7XX XXX XXX" value="${escapeHtml(local)}">
+  </div></div>`;
+}
+// Best-effort split of a possibly-already-combined legacy number, so
+// editing an existing business pre-fills the country selector sensibly
+// instead of showing the whole jumbled string in the local-number box.
+function splitE164(value) {
+  const v = (value || '').trim();
+  if (v.startsWith('+')) {
+    const match = ALIKO_COUNTRY_CODES.find((c) => c.cc !== 'other' && v.startsWith('+' + c.cc));
+    if (match) return { cc: match.cc, local: v.slice(match.cc.length + 1) };
+    return { cc: 'other', local: v };
+  }
+  return { cc: '254', local: v };
+}
+function readCountryPhoneField(idPrefix) {
+  const ccEl = document.getElementById(idPrefix + '-cc');
+  const localEl = document.getElementById(idPrefix + '-local');
+  if (!ccEl || !localEl) return '';
+  return combinePhoneE164(ccEl.value, localEl.value);
+}
+function combinePhoneE164(countryCode, local) {
+  local = (local || '').trim();
+  if (!local) return '';
+  if (countryCode === 'other' || local.startsWith('+')) return '+' + local.replace(/[^\d]/g, '');
+  const digits = local.replace(/\D/g, '').replace(/^0+/, '');
+  if (!digits) return '';
+  return '+' + countryCode + digits;
+}
+// Normalizes a possibly-legacy (no country code, leading-zero) number for
+// building tel:/wa.me links. defaultCC is a last-resort guess for old
+// data saved before this fix existed — never applied to numbers that
+// already look international.
+function normalizePhoneForLink(value, defaultCC) {
+  const v = (value || '').trim();
+  if (!v) return '';
+  if (v.startsWith('+')) return v.replace(/[^\d+]/g, '');
+  const digits = v.replace(/\D/g, '');
+  if (digits.length > 10) return '+' + digits; // already looks like it has a country code
+  return '+' + (defaultCC || '254') + digits.replace(/^0+/, '');
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   applyReducedMotionClass();
   initScrollTop();

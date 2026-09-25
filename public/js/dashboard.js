@@ -45,7 +45,7 @@ function paint() {
       <h3>Edit listing</h3>
       <form id="editForm">
         <div class="field-grid"><div class="field"><label>Name</label><input id="e-name" value="${escapeHtml(b.name)}"></div><div class="field"><label>Category</label><input id="e-category" value="${escapeHtml(b.category)}"></div></div>
-        <div class="field-grid"><div class="field"><label>Phone</label><input id="e-phone" value="${escapeHtml(b.phone)}"></div><div class="field"><label>WhatsApp</label><input id="e-whatsapp" value="${escapeHtml(b.whatsapp)}"></div></div>
+        <div class="field-grid" id="phoneFieldsMount-${b.id}"></div>
         <div class="field"><label>Description</label><textarea id="e-desc" rows="2">${escapeHtml(b.description)}</textarea></div>
         <div class="field"><label>Products / keywords</label><input id="e-tags" value="${escapeHtml((b.tags || []).join(', '))}"></div>
         <div class="field-grid"><div class="field"><label>Building</label><input id="e-building" value="${escapeHtml(b.building)}"></div><div class="field"><label>Floor</label><input id="e-floor" value="${escapeHtml(b.floor)}"></div><div class="field"><label>Shop</label><input id="e-shop" value="${escapeHtml(b.shop)}"></div></div>
@@ -105,6 +105,14 @@ function paint() {
 }
 
 function wireForms(b) {
+  // Fix: phone/WhatsApp editing now uses country-code + local-number
+  // pairs, same as the registration form — see countryPhoneFieldHTML in
+  // shared.js for why (wa.me/tel: links silently fail without a real
+  // country code).
+  document.getElementById('phoneFieldsMount-' + b.id).innerHTML =
+    countryPhoneFieldHTML('e-phone', 'Phone', b.phone) +
+    countryPhoneFieldHTML('e-whatsapp', 'WhatsApp', b.whatsapp);
+
   document.getElementById('exportCsvBtn').addEventListener('click', async () => {
     try {
       const res = await fetch('/api/businesses/' + b.id + '/export.csv', { headers: { Authorization: 'Bearer ' + getToken() } });
@@ -153,7 +161,7 @@ function wireForms(b) {
     try {
       await api('/businesses/' + b.id, { method: 'PUT', body: {
         name: document.getElementById('e-name').value.trim(), category: document.getElementById('e-category').value.trim(),
-        phone: document.getElementById('e-phone').value.trim(), whatsapp: document.getElementById('e-whatsapp').value.trim(),
+        phone: readCountryPhoneField('e-phone'), whatsapp: readCountryPhoneField('e-whatsapp'),
         description: document.getElementById('e-desc').value.trim(), tags: document.getElementById('e-tags').value.trim(),
         building: document.getElementById('e-building').value.trim(), floor: document.getElementById('e-floor').value.trim(),
         shop: document.getElementById('e-shop').value.trim(), entrance: document.getElementById('e-entrance').value.trim(),

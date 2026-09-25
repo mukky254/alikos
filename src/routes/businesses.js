@@ -212,6 +212,17 @@ router.get('/mine', requireAuth, async (req, res) => {
   res.json({ businesses: await Promise.all(rows.map(withComputed)) });
 });
 
+// Feature: personal share link ("Find me on Aliko"). Public, no auth —
+// this is what a shared social-media link resolves against. Only exposes
+// the owner's display name and their *verified* listings (never
+// unverified/pending ones, and never email or other account details).
+router.get('/by-owner/:userId', async (req, res) => {
+  const owner = await getOne('SELECT id, name FROM users WHERE id = $1', [req.params.userId]);
+  if (!owner) return res.status(404).json({ error: 'This link is no longer valid.' });
+  const rows = await getAll('SELECT * FROM businesses WHERE owner_id = $1 AND verified = 1 ORDER BY created_at DESC', [req.params.userId]);
+  res.json({ owner: { id: owner.id, name: owner.name }, businesses: await Promise.all(rows.map(withComputed)) });
+});
+
 router.get('/:id', async (req, res) => {
   const biz = await getOne('SELECT * FROM businesses WHERE id = $1', [req.params.id]);
   if (!biz) return res.status(404).json({ error: 'Business not found.' });

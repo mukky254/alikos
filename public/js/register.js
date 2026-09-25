@@ -2,6 +2,13 @@
 renderNav('register');
 requireLogin();
 
+// Fix: phone/WhatsApp now collected as country-code + local-number pairs,
+// combined into a proper international (+254...) format on submit —
+// wa.me and tel: links silently fail or misroute without this.
+document.getElementById('phoneFieldsMount').innerHTML =
+  countryPhoneFieldHTML('f-phone', 'Phone', '') +
+  countryPhoneFieldHTML('f-whatsapp', 'WhatsApp', '');
+
 async function checkDuplicate() {
   const name = document.getElementById('f-name').value.trim();
   const building = document.getElementById('f-building').value.trim();
@@ -35,8 +42,8 @@ document.getElementById('registerForm').addEventListener('submit', async (e) => 
   const body = {
     name: document.getElementById('f-name').value.trim(),
     category: document.getElementById('f-category').value,
-    phone: document.getElementById('f-phone').value.trim(),
-    whatsapp: document.getElementById('f-whatsapp').value.trim(),
+    phone: readCountryPhoneField('f-phone'),
+    whatsapp: readCountryPhoneField('f-whatsapp'),
     description: document.getElementById('f-desc').value.trim(),
     tags: document.getElementById('f-tags').value.trim(),
     lat: document.getElementById('f-lat').value,

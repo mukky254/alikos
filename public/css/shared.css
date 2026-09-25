@@ -122,6 +122,11 @@
 .rb-fill{ height: 100%; background: var(--signal-amber); border-radius: 3px; }
 .rb-count{ width: 24px; text-align: right; flex: none; }
 
+/* Country-code phone field pair */
+.phone-field-row{ display: flex; gap: 6px; }
+.phone-cc-select{ flex: none; width: 40%; min-width: 128px; }
+.phone-field-row input{ flex: 1; }
+
 /* Focus visibility for keyboard users */
 a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible{
   outline: 2px solid var(--route); outline-offset: 2px;

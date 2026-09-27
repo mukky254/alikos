@@ -230,6 +230,23 @@ async function initSchema() {
       created_at BIGINT NOT NULL DEFAULT extract(epoch from now())::bigint
     );
 
+    -- Added after initial release: when was this business last verified,
+    -- so the profile can show "Verified 12 Sep 2026" instead of just a
+    -- static VERIFIED badge with no sense of how current that check is.
+    ALTER TABLE businesses ADD COLUMN IF NOT EXISTS verified_at BIGINT;
+
+    -- Alternative names a business is commonly known by ("Al Huda",
+    -- "Alhuda", "Al-Huda Electronics"), stored as a JSON array of strings
+    -- — same TEXT-as-JSON convention as hours_json above, so search can
+    -- match any of them without a separate join table.
+    ALTER TABLE businesses ADD COLUMN IF NOT EXISTS aliases_json TEXT DEFAULT '[]';
+
+    -- Multiple named entrances for one business ("Entrance A — Tom Mboya
+    -- Street", "Entrance B — Moi Avenue"), stored as a JSON array of
+    -- {label, description, lat, lng} objects (lat/lng optional — when
+    -- present, navigation can pick the nearest one to the user).
+    ALTER TABLE businesses ADD COLUMN IF NOT EXISTS entrances_json TEXT DEFAULT '[]';
+
     CREATE INDEX IF NOT EXISTS idx_businesses_category ON businesses(category);
     CREATE INDEX IF NOT EXISTS idx_businesses_owner ON businesses(owner_id);
     CREATE INDEX IF NOT EXISTS idx_reviews_business ON reviews(business_id);

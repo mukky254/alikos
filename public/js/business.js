@@ -64,8 +64,18 @@ function rememberRecentlyViewed(b) {
 
 function tierBadge(b) {
   if (!b.verified) return '<span class="badge pending">PENDING VERIFICATION</span>';
-  if (b.verification_tier === 'premium') return '<span class="badge premium">PREMIUM VERIFIED</span>';
-  return '<span class="badge verified">VERIFIED</span>';
+  const tier = b.verification_tier === 'premium' ? '<span class="badge premium">PREMIUM VERIFIED</span>' : '<span class="badge verified">VERIFIED</span>';
+  // Feature: last-verified date, so a VERIFIED badge doesn't imply a
+  // permanent, unchecked-since-forever status.
+  return tier + (b.verified_at ? `<span class="verified-at">Verified ${relativeDate(b.verified_at)}</span>` : '');
+}
+function relativeDate(unixSeconds) {
+  const diffDays = Math.floor((Date.now() / 1000 - unixSeconds) / 86400);
+  if (diffDays < 1) return 'today';
+  if (diffDays === 1) return 'yesterday';
+  if (diffDays < 30) return diffDays + ' days ago';
+  if (diffDays < 365) return Math.floor(diffDays / 30) + ' month' + (Math.floor(diffDays / 30) > 1 ? 's' : '') + ' ago';
+  return new Date(unixSeconds * 1000).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
 }
 
 function hoursTable(hours) {
@@ -134,6 +144,7 @@ function render(b) {
       <div>
         <h1 class="profile-name">${escapeHtml(b.name)} ${tierBadge(b)} ${b.openNow === true ? '<span class="badge open">OPEN NOW</span>' : b.openNow === false ? '<span class="badge closed">CLOSED</span>' : ''}</h1>
         <div class="profile-meta">${escapeHtml(b.category)} ${b.avgRating ? `· <span class="stars">${'★'.repeat(Math.round(b.avgRating))}</span> ${b.avgRating} (${b.reviews.length})` : '· No reviews yet'}</div>
+        ${b.aliases && b.aliases.length ? `<div class="also-known-as">Also known as: ${b.aliases.map(escapeHtml).join(', ')}</div>` : ''}
         ${b.tags && b.tags.length ? `<div class="chip-row" style="margin:10px 0 0;">${b.tags.map((t) => `<span class="chip tag">${escapeHtml(t)}</span>`).join('')}</div>` : ''}
       </div>
       <div style="display:flex;gap:8px;">
@@ -295,11 +306,42 @@ function wireActions(b, user, isOwner) {
     { label: b.name },
   ]);
 
-  document.getElementById('reportBtn').addEventListener('click', async () => {
-    const reason = prompt('What seems wrong with this listing?');
-    if (!reason) return;
-    try { await api('/businesses/' + b.id + '/report', { method: 'POST', body: { reason } }); toast('Thanks — our team will review this.'); }
-    catch (e) { toast(e.message); }
+  // Feature: structured location-confirmation reports — replaces a bare
+  // prompt() with the actual reasons that matter for a location app, so
+  // admin review queues get useful, consistent categories instead of
+  // free-text guesses.
+  document.getElementById('reportBtn').addEventListener('click', () => {
+    const REPORT_REASONS = [
+      'Business has moved',
+      'Business has closed',
+      'Shop/unit number is incorrect',
+      'Entrance information is incorrect',
+      'Floor information is incorrect',
+      'Other issue',
+    ];
+    const overlay = document.createElement('div');
+    overlay.className = 'arrival-overlay';
+    overlay.innerHTML = `<div class="arrival-card" style="text-align:left;">
+      <div class="arrival-title">What's wrong with this listing?</div>
+      <div class="report-options">${REPORT_REASONS.map((r, i) => `<label class="report-option"><input type="radio" name="reportReason" value="${escapeHtml(r)}" ${i === 0 ? 'checked' : ''}> ${escapeHtml(r)}</label>`).join('')}</div>
+      <div class="field" style="margin:12px 0;"><label>Details (optional)</label><textarea id="reportDetails" rows="2" placeholder="Anything else that would help our team…"></textarea></div>
+      <div style="display:flex;gap:10px;">
+        <button class="btn ghost block" id="reportCancelBtn">Cancel</button>
+        <button class="btn primary block" id="reportSubmitBtn">Submit report</button>
+      </div>
+    </div>`;
+    document.body.appendChild(overlay);
+    overlay.querySelector('#reportCancelBtn').addEventListener('click', () => overlay.remove());
+    overlay.querySelector('#reportSubmitBtn').addEventListener('click', async () => {
+      const chosen = overlay.querySelector('input[name="reportReason"]:checked').value;
+      const details = overlay.querySelector('#reportDetails').value.trim();
+      const reason = details ? `${chosen} — ${details}` : chosen;
+      try {
+        await api('/businesses/' + b.id + '/report', { method: 'POST', body: { reason } });
+        toast('Thanks — our team will review this.');
+        overlay.remove();
+      } catch (e) { toast(e.message); }
+    });
   });
 
   const claimBtn = document.getElementById('claimBtn');
@@ -485,6 +527,9 @@ const NAV_STYLE = 'https://tiles.openfreemap.org/styles/liberty';
 
 function startNavigation(b) {
   if (!navigator.geolocation) { toast('Geolocation is not available in this browser.'); return; }
+  explainLocationThenRequest(() => doStartNavigation(b));
+}
+function doStartNavigation(b) {
   currentBusiness_forNav = b;
   resetNav();
   NAV.active = true;
@@ -1002,19 +1047,42 @@ function updateFinalApproach(distToDest) {
   const b = currentBusiness_forNav;
   const card = document.getElementById('navFinalApproach');
   if (!card || !b) return;
-  const hasIndoorInfo = b.floor || b.shop || b.entrance || b.landmark;
+  const hasIndoorInfo = b.floor || b.shop || b.entrance || b.landmark || (b.entrances && b.entrances.length);
   if (distToDest > FINAL_APPROACH_M || !hasIndoorInfo) { card.classList.add('hidden'); return; }
   if (!NAV.finalApproachShown) { NAV.finalApproachShown = true; vibrate([30, 40, 30]); }
   card.classList.remove('hidden');
+
+  // Feature: multiple entrances. When a business has more than one
+  // entrance defined, pick the nearest one to the user's current position
+  // (when entrances have a pinned location) and show it as the
+  // recommendation, with the rest listed as alternatives — rather than
+  // just naming one fixed entrance regardless of which side you approach
+  // from.
+  let entranceBlock = '';
+  const entrances = b.entrances || [];
+  if (entrances.length > 1) {
+    const withDist = entrances.map((en) => ({
+      ...en,
+      dist: (en.lat != null && NAV.currentLat != null) ? haversine(NAV.currentLat, NAV.currentLng, en.lat, en.lng) : null,
+    }));
+    const hasDistances = withDist.some((e) => e.dist != null);
+    if (hasDistances) withDist.sort((a, b2) => (a.dist ?? Infinity) - (b2.dist ?? Infinity));
+    entranceBlock = `<div class="entrance-list-nav">${withDist.map((en, i) => `
+      <div class="entrance-pick ${hasDistances && i === 0 ? 'nearest' : ''}">
+        <div class="ep-label"><span>${escapeHtml(en.label || 'Entrance')}</span>${hasDistances && i === 0 ? '<span>Nearest</span>' : ''}</div>
+        ${en.description ? `<div class="muted">${escapeHtml(en.description)}</div>` : ''}
+      </div>`).join('')}</div>`;
+  }
+
   const rows = [
     b.building ? ['Building', b.building] : null,
     b.floor ? ['Floor', b.floor] : null,
     b.shop ? ['Shop / Unit', b.shop] : null,
-    b.entrance ? ['Entrance', b.entrance] : null,
+    (!entrances.length && b.entrance) ? ['Entrance', b.entrance] : null,
     b.landmark ? ['Landmark', b.landmark] : null,
   ].filter(Boolean);
   card.innerHTML = `<div class="fa-title">Almost there · ${Math.round(distToDest)}m</div>` +
-    rows.map(([k, v]) => `<div class="fa-row"><span>${k}</span><strong>${v}</strong></div>`).join('');
+    rows.map(([k, v]) => `<div class="fa-row"><span>${k}</span><strong>${v}</strong></div>`).join('') + entranceBlock;
 }
 
 function onGpsError(err) {

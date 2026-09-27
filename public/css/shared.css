@@ -122,10 +122,42 @@
 .rb-fill{ height: 100%; background: var(--signal-amber); border-radius: 3px; }
 .rb-count{ width: 24px; text-align: right; flex: none; }
 
-/* Country-code phone field pair */
-.phone-field-row{ display: flex; gap: 6px; }
-.phone-cc-select{ flex: none; width: 40%; min-width: 128px; }
-.phone-field-row input{ flex: 1; }
+/* Kenya-only phone field: fixed +254 prefix + local number */
+.phone-field-row{ display: flex; gap: 8px; align-items: center; }
+.phone-cc-fixed{
+  flex: none; background: var(--surface-2); border: 1px solid var(--line-strong); border-radius: var(--radius-sm);
+  padding: 9px 10px; font-size: 13px; font-weight: 700; color: var(--ink-dim); white-space: nowrap;
+}
+.phone-field-row input{ flex: 1; min-width: 0; }
+.verified-at{ display: block; font-size: 10.5px; color: var(--ink-faint); font-weight: 600; margin-top: 2px; }
+
+/* Structured location-report options */
+.report-options{ display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.report-option{ display: flex; align-items: center; gap: 10px; font-size: 13.5px; padding: 8px 10px; border-radius: var(--radius-sm); background: rgba(255,255,255,.04); cursor: pointer; }
+.report-option:hover{ background: rgba(255,255,255,.08); }
+
+/* Recent-searches dropdown header */
+.suggest-recent-header{ display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; font-size: 11px; color: var(--ink-faint); text-transform: uppercase; letter-spacing: .04em; }
+.suggest-recent-header button{ background: none; border: none; color: var(--route); font-size: 11px; font-weight: 700; text-transform: none; letter-spacing: 0; }
+
+/* Typo-tolerant search fallback banner */
+.fuzzy-banner{ background: rgba(155,140,255,.1); color: var(--signal-violet); border: 1px solid rgba(155,140,255,.3); border-radius: var(--radius-sm); padding: 8px 12px; font-size: 12.5px; font-weight: 600; margin-bottom: 10px; }
+
+/* Alias tag input */
+.alias-tags{ display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.alias-tag{ display: flex; align-items: center; gap: 6px; background: rgba(255,255,255,.06); border-radius: 999px; padding: 5px 10px; font-size: 12px; }
+.alias-tag button{ background: none; border: none; color: var(--ink-faint); font-size: 12px; padding: 0; }
+.also-known-as{ font-size: 12px; color: var(--ink-faint); margin: 4px 0 12px; }
+
+/* Multiple-entrances editor */
+.entrance-row{ display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; margin-bottom: 8px; align-items: center; }
+.entrance-row input{ width: 100%; }
+.entrance-row button{ background: none; border: none; color: var(--signal-red); font-size: 16px; }
+.entrance-geo-btn{ font-size: 11px; padding: 4px 8px; }
+.entrance-list-nav{ display: flex; flex-direction: column; gap: 8px; margin: 10px 0; }
+.entrance-pick{ background: var(--bg-raised); border-radius: var(--radius-sm); padding: 10px 12px; font-size: 13px; }
+.entrance-pick.nearest{ border: 1px solid var(--route); }
+.entrance-pick .ep-label{ font-weight: 700; display: flex; justify-content: space-between; }
 
 /* Focus visibility for keyboard users */
 a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible{

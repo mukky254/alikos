@@ -48,10 +48,18 @@ function paint() {
         <div class="field-grid" id="phoneFieldsMount-${b.id}"></div>
         <div class="field"><label>Description</label><textarea id="e-desc" rows="2">${escapeHtml(b.description)}</textarea></div>
         <div class="field"><label>Products / keywords</label><input id="e-tags" value="${escapeHtml((b.tags || []).join(', '))}"></div>
+        <div class="field"><label>Also known as (comma-separated)</label><input id="e-aliases" value="${escapeHtml((b.aliases || []).join(', '))}" placeholder="e.g. Al Huda, Alhuda, Al-Huda Electronics"></div>
         <div class="field-grid"><div class="field"><label>Building</label><input id="e-building" value="${escapeHtml(b.building)}"></div><div class="field"><label>Floor</label><input id="e-floor" value="${escapeHtml(b.floor)}"></div><div class="field"><label>Shop</label><input id="e-shop" value="${escapeHtml(b.shop)}"></div></div>
         <div class="field-grid"><div class="field"><label>Entrance</label><input id="e-entrance" value="${escapeHtml(b.entrance)}"></div><div class="field"><label>Landmark</label><input id="e-landmark" value="${escapeHtml(b.landmark)}"></div></div>
         <button class="btn primary" type="submit">Save changes</button>
       </form>
+    </div>
+    <div class="card">
+      <h3>Entrances</h3>
+      <p class="muted" style="font-size:12.5px;margin-bottom:10px;">If this building has more than one entrance, list them here. Add a pinned location for each (optional) and navigation will point people to the nearest one.</p>
+      <div id="entranceRows-${b.id}"></div>
+      <button class="btn ghost small" type="button" id="addEntranceBtn-${b.id}">+ Add entrance</button>
+      <button class="btn" type="button" id="saveEntrancesBtn-${b.id}" style="margin-top:10px;display:block;">Save entrances</button>
     </div>
     <div class="card">
       <h3>Opening hours</h3>
@@ -163,6 +171,7 @@ function wireForms(b) {
         name: document.getElementById('e-name').value.trim(), category: document.getElementById('e-category').value.trim(),
         phone: readCountryPhoneField('e-phone'), whatsapp: readCountryPhoneField('e-whatsapp'),
         description: document.getElementById('e-desc').value.trim(), tags: document.getElementById('e-tags').value.trim(),
+        aliases: document.getElementById('e-aliases').value.split(',').map((s) => s.trim()).filter(Boolean),
         building: document.getElementById('e-building').value.trim(), floor: document.getElementById('e-floor').value.trim(),
         shop: document.getElementById('e-shop').value.trim(), entrance: document.getElementById('e-entrance').value.trim(),
         landmark: document.getElementById('e-landmark').value.trim(),
@@ -179,6 +188,48 @@ function wireForms(b) {
       hours[d] = isOpen ? [document.querySelector(`.day-start[data-day="${d}"]`).value, document.querySelector(`.day-end[data-day="${d}"]`).value] : null;
     });
     try { await api('/businesses/' + b.id, { method: 'PUT', body: { hours } }); toast('Hours saved.'); refreshCurrent(); }
+    catch (err) { toast(err.message); }
+  });
+
+  // Feature: multiple entrances. Each row is label + description, with an
+  // optional pinned location (captured via the device's own GPS) so
+  // navigation can later work out which entrance is actually closest to
+  // wherever the visitor is approaching from.
+  const entranceRowsEl = document.getElementById('entranceRows-' + b.id);
+  let entranceRows = (b.entrances && b.entrances.length ? b.entrances : [{}]).map((en) => ({ ...en }));
+
+  function paintEntranceRows() {
+    entranceRowsEl.innerHTML = entranceRows.map((en, i) => `
+      <div class="entrance-row" data-i="${i}">
+        <input class="ent-label" placeholder="Label (e.g. Entrance A)" value="${escapeHtml(en.label || '')}">
+        <input class="ent-desc" placeholder="Description (e.g. Tom Mboya Street)" value="${escapeHtml(en.description || '')}">
+        <button type="button" class="ent-remove" title="Remove">✕</button>
+      </div>
+      <button type="button" class="btn ghost small entrance-geo-btn" data-i="${i}">${en.lat != null ? '📍 Location set — update' : '📍 Use my current location'}</button>
+    `).join('');
+    entranceRowsEl.querySelectorAll('.entrance-row').forEach((row) => {
+      const i = Number(row.dataset.i);
+      row.querySelector('.ent-label').addEventListener('input', (e) => { entranceRows[i].label = e.target.value; });
+      row.querySelector('.ent-desc').addEventListener('input', (e) => { entranceRows[i].description = e.target.value; });
+      row.querySelector('.ent-remove').addEventListener('click', () => { entranceRows.splice(i, 1); if (!entranceRows.length) entranceRows.push({}); paintEntranceRows(); });
+    });
+    entranceRowsEl.querySelectorAll('.entrance-geo-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const i = Number(btn.dataset.i);
+        if (!navigator.geolocation) { toast('Geolocation is not available in this browser.'); return; }
+        navigator.geolocation.getCurrentPosition(
+          (pos) => { entranceRows[i].lat = pos.coords.latitude; entranceRows[i].lng = pos.coords.longitude; toast('Entrance location captured.'); paintEntranceRows(); },
+          (err) => toast('Could not get location: ' + err.message)
+        );
+      });
+    });
+  }
+  paintEntranceRows();
+
+  document.getElementById('addEntranceBtn-' + b.id).addEventListener('click', () => { entranceRows.push({}); paintEntranceRows(); });
+  document.getElementById('saveEntrancesBtn-' + b.id).addEventListener('click', async () => {
+    const cleaned = entranceRows.filter((en) => (en.label || '').trim() || (en.description || '').trim());
+    try { await api('/businesses/' + b.id, { method: 'PUT', body: { entrances: cleaned } }); toast('Entrances saved.'); refreshCurrent(); }
     catch (err) { toast(err.message); }
   });
 

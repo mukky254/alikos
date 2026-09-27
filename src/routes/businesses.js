@@ -53,8 +53,44 @@ async function withComputed(biz) {
     confidence,
     openNow: isOpenNow(biz.hours_json),
     hours: biz.hours_json ? JSON.parse(biz.hours_json) : null,
+    aliases: parseJsonArray(biz.aliases_json),
+    entrances: parseJsonArray(biz.entrances_json),
   };
 }
+
+// Feature: typo-tolerant search. Plain edit-distance similarity in JS,
+// not a Postgres extension (pg_trgm) — some managed Postgres tiers
+// restrict CREATE EXTENSION, so this works identically regardless of
+// which provider DATABASE_URL points at.
+function levenshtein(a, b) {
+  const m = a.length, n = b.length;
+  const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+  for (let i = 0; i <= m; i++) dp[i][0] = i;
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      dp[i][j] = a[i - 1] === b[j - 1] ? dp[i - 1][j - 1] : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+    }
+  }
+  return dp[m][n];
+}
+function nameSimilarity(query, name) {
+  const a = query.toLowerCase().trim(), b = (name || '').toLowerCase().trim();
+  if (!a || !b) return 0;
+  const wholeScore = 1 - levenshtein(a, b) / Math.max(a.length, b.length);
+  // Also compare against each individual word in the name, so a short
+  // query like "alhuda" scores well against "Al-Huda Electronics" even
+  // though the full strings are very different lengths.
+  let bestWordScore = 0;
+  b.split(/[\s\-]+/).forEach((w) => {
+    if (!w) return;
+    const s = 1 - levenshtein(a, w) / Math.max(a.length, w.length, 1);
+    if (s > bestWordScore) bestWordScore = s;
+  });
+  return Math.max(wholeScore, bestWordScore);
+}
+
+function parseJsonArray(text) { try { const v = JSON.parse(text || '[]'); return Array.isArray(v) ? v : []; } catch (e) { return []; } }
 
 // ---------- Search / list ----------
 // This endpoint is intentionally kept to one main SQL query. The old version
@@ -79,6 +115,7 @@ router.get('/', async (req, res) => {
       COALESCE(b.building,'') ILIKE ${qp} OR
       COALESCE(b.landmark,'') ILIKE ${qp} OR
       COALESCE(b.description,'') ILIKE ${qp} OR
+      COALESCE(b.aliases_json,'') ILIKE ${qp} OR
       EXISTS (SELECT 1 FROM product_tags pt WHERE pt.business_id = b.id AND pt.tag ILIKE ${qp})
     )`);
   }
@@ -108,11 +145,7 @@ router.get('/', async (req, res) => {
     }
   }
 
-  // openNow is deliberately applied after fetching the compact result set.
-  // hours_json is stored as JSON text and cannot be cheaply indexed with the
-  // current schema.
-  const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
-  const rows = await getAll(`
+  const runSearch = (whereSql) => getAll(`
     SELECT
       b.*,
       ${distanceSql},
@@ -132,6 +165,31 @@ router.get('/', async (req, res) => {
     LIMIT 100
   `, params);
 
+  // openNow is deliberately applied after fetching the compact result set.
+  // hours_json is stored as JSON text and cannot be cheaply indexed with the
+  // current schema.
+  const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
+  let rows = await runSearch(whereSql);
+
+  let fuzzyMatch = false;
+  if (qText && rows.length === 0) {
+    // Nothing matched exactly/as a substring — try edit-distance matching
+    // against every business name ("Safarcom" → "Safaricom").
+    const candidates = await getAll('SELECT id, name FROM businesses LIMIT 3000');
+    const scored = candidates
+      .map((c) => ({ id: c.id, score: nameSimilarity(qText, c.name) }))
+      .filter((c) => c.score >= 0.5)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 20);
+    if (scored.length) {
+      fuzzyMatch = true;
+      const idsParam = add(scored.map((s) => s.id));
+      rows = await runSearch(`WHERE b.id = ANY(${idsParam})`);
+      const scoreById = new Map(scored.map((s) => [s.id, s.score]));
+      rows.sort((a, b) => (scoreById.get(b.id) || 0) - (scoreById.get(a.id) || 0));
+    }
+  }
+
   let result = rows.map((b) => ({
     ...b,
     verified: !!b.verified,
@@ -139,6 +197,8 @@ router.get('/', async (req, res) => {
     avgRating: Number(b.avgRating) ? Math.round(Number(b.avgRating) * 10) / 10 : null,
     reviewCount: Number(b.reviewCount) || 0,
     distanceKm: b.distanceKm == null ? null : Number(b.distanceKm),
+    aliases: parseJsonArray(b.aliases_json),
+    entranceCount: parseJsonArray(b.entrances_json).length,
   }));
 
   if (openNow === '1') result = result.filter((b) => b.openNow !== false);
@@ -152,9 +212,9 @@ router.get('/', async (req, res) => {
     newest: (a, b) => Number(b.created_at) - Number(a.created_at),
     default: (a, b) => Number(b.verified) - Number(a.verified) || a.name.localeCompare(b.name),
   };
-  result.sort(sorters[sortKey] || sorters.default);
+  if (!fuzzyMatch) result.sort(sorters[sortKey] || sorters.default);
 
-  res.json({ businesses: result.slice(0, 60), total: result.length });
+  res.json({ businesses: result.slice(0, 60), total: result.length, fuzzyMatch });
 });
 
 router.get('/autocomplete', async (req, res) => {
@@ -266,9 +326,9 @@ router.post('/', requireAuth, async (req, res) => {
     const lat = parseFloat(b.lat), lng = parseFloat(b.lng);
     if (Number.isNaN(lat) || Number.isNaN(lng)) return res.status(400).json({ error: 'GPS coordinates must be valid numbers.' });
     const { rows } = await run(
-      `INSERT INTO businesses (owner_id, name, category, description, phone, whatsapp, email, website, lat, lng, building, floor, shop, entrance, landmark, verified)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,0) RETURNING *`,
-      [req.user.id, b.name.trim(), b.category, b.description || '', b.phone, b.whatsapp || '', b.email || '', b.website || '', lat, lng, b.building, b.floor || '', b.shop || '', b.entrance || '', b.landmark || '']
+      `INSERT INTO businesses (owner_id, name, category, description, phone, whatsapp, email, website, lat, lng, building, floor, shop, entrance, landmark, verified, aliases_json)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,0,$16) RETURNING *`,
+      [req.user.id, b.name.trim(), b.category, b.description || '', b.phone, b.whatsapp || '', b.email || '', b.website || '', lat, lng, b.building, b.floor || '', b.shop || '', b.entrance || '', b.landmark || '', JSON.stringify(Array.isArray(b.aliases) ? b.aliases : [])]
     );
     const biz = rows[0];
     if (b.tags) {
@@ -288,6 +348,8 @@ router.put('/:id', requireAuth, async (req, res) => {
     const sets = []; const params = [];
     editable.forEach((f) => { if (req.body[f] !== undefined) { params.push(req.body[f]); sets.push(`${f} = $${params.length}`); } });
     if (req.body.hours) { params.push(JSON.stringify(req.body.hours)); sets.push(`hours_json = $${params.length}`); }
+    if (req.body.aliases !== undefined) { params.push(JSON.stringify(req.body.aliases || [])); sets.push(`aliases_json = $${params.length}`); }
+    if (req.body.entrances !== undefined) { params.push(JSON.stringify(req.body.entrances || [])); sets.push(`entrances_json = $${params.length}`); }
     if (!sets.length && req.body.tags === undefined) return res.status(400).json({ error: 'No editable fields supplied.' });
     if (sets.length) {
       params.push(req.params.id);

@@ -97,11 +97,17 @@ async function loadResults() {
     if (state.lat != null) { params.set('lat', state.lat); params.set('lng', state.lng); }
     if (state.sort) params.set('sort', state.sort);
     if (state.openNow) params.set('openNow', '1');
-    const { businesses } = await api('/businesses?' + params.toString());
+    const { businesses, fuzzyMatch } = await api('/businesses?' + params.toString());
     document.getElementById('resultCount').textContent =
       businesses.length + (businesses.length === 1 ? ' business found' : ' businesses found') + (state.lat != null ? ' · sorted by distance' : '');
     if (!businesses.length) { wrap.innerHTML = '<div class="empty">No matches yet. Try a different name, category, or building.</div>'; }
-    else { wrap.innerHTML = businesses.map(rowHTML).join(''); }
+    else {
+      // Feature: typo-tolerant search fallback banner — tells the person
+      // these are close spelling matches, not an exact hit, so the jump
+      // from "Safarcom" to "Safaricom" doesn't feel unexplained.
+      const fuzzyBanner = fuzzyMatch ? `<div class="fuzzy-banner">No exact match for "${escapeHtml(state.query)}" — showing similar results</div>` : '';
+      wrap.innerHTML = fuzzyBanner + businesses.map(rowHTML).join('');
+    }
     if (state.mapView) renderMap(businesses);
   } catch (e) {
     wrap.innerHTML = `<div class="error-box">${escapeHtml(e.message)}</div>`;
@@ -149,6 +155,37 @@ document.getElementById('searchInput').addEventListener('input', (e) => {
   debounceTimer = setTimeout(() => { loadResults(); loadSuggestions(e.target.value); }, 250);
 });
 document.getElementById('searchInput').addEventListener('blur', () => setTimeout(() => { document.getElementById('suggestBox').style.display = 'none'; }, 150));
+// Feature: recent searches. Shown when the search box is focused empty
+// (before typing), so returning users can re-run a past search in one
+// tap instead of retyping it.
+document.getElementById('searchInput').addEventListener('focus', (e) => { if (!e.target.value) renderRecentSearches(); });
+document.getElementById('searchInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && e.target.value.trim()) { saveRecentSearch(e.target.value.trim()); document.getElementById('suggestBox').style.display = 'none'; e.target.blur(); }
+});
+
+const RECENT_SEARCHES_KEY = 'aliko_recent_searches';
+function getRecentSearches() { try { return JSON.parse(localStorage.getItem(RECENT_SEARCHES_KEY) || '[]'); } catch (e) { return []; } }
+function saveRecentSearch(term) {
+  let list = getRecentSearches().filter((t) => t.toLowerCase() !== term.toLowerCase());
+  list.unshift(term);
+  try { localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(list.slice(0, 8))); } catch (e) {}
+}
+function renderRecentSearches() {
+  const box = document.getElementById('suggestBox');
+  const list = getRecentSearches();
+  if (!list.length) { box.style.display = 'none'; return; }
+  box.innerHTML = `<div class="suggest-recent-header">Recent searches <button type="button" id="clearRecentBtn">Clear</button></div>` +
+    list.map((t) => `<div class="suggest-item recent" data-term="${escapeHtml(t)}">🕘 ${escapeHtml(t)}</div>`).join('');
+  box.style.display = 'block';
+  box.querySelectorAll('.suggest-item.recent').forEach((row) => row.addEventListener('mousedown', () => {
+    document.getElementById('searchInput').value = row.dataset.term;
+    state.query = row.dataset.term;
+    loadResults();
+    box.style.display = 'none';
+  }));
+  const clearBtn = document.getElementById('clearRecentBtn');
+  if (clearBtn) clearBtn.addEventListener('mousedown', (e) => { e.stopPropagation(); localStorage.removeItem(RECENT_SEARCHES_KEY); box.style.display = 'none'; toast('Recent searches cleared'); });
+}
 
 async function loadSuggestions(q) {
   const box = document.getElementById('suggestBox');
@@ -158,16 +195,18 @@ async function loadSuggestions(q) {
     if (!suggestions.length) { box.style.display = 'none'; return; }
     box.innerHTML = suggestions.map((s) => `<div class="suggest-item" data-id="${s.id}"><strong>${escapeHtml(s.name)}</strong><div class="faint" style="font-size:11px;">${escapeHtml(s.category)} · ${escapeHtml(s.building || '')}</div></div>`).join('');
     box.style.display = 'block';
-    box.querySelectorAll('.suggest-item').forEach((row) => row.addEventListener('mousedown', () => { window.location.href = 'business.html?id=' + row.dataset.id; }));
+    box.querySelectorAll('.suggest-item').forEach((row) => row.addEventListener('mousedown', () => { saveRecentSearch(row.querySelector('strong').textContent); window.location.href = 'business.html?id=' + row.dataset.id; }));
   } catch (e) { box.style.display = 'none'; }
 }
 
 document.getElementById('nearMeBtn').addEventListener('click', () => {
   if (!navigator.geolocation) { toast('Geolocation is not available in this browser.'); return; }
-  toast('Getting your location…');
-  navigator.geolocation.getCurrentPosition(
-    (pos) => { state.lat = pos.coords.latitude; state.lng = pos.coords.longitude; toast('Location found — sorted by distance.'); loadResults(); },
-    (err) => toast('Could not get your location (' + err.message + ').'),
-    { enableHighAccuracy: true, timeout: 8000 }
-  );
+  explainLocationThenRequest(() => {
+    toast('Getting your location…');
+    navigator.geolocation.getCurrentPosition(
+      (pos) => { state.lat = pos.coords.latitude; state.lng = pos.coords.longitude; toast('Location found — sorted by distance.'); loadResults(); },
+      (err) => toast('Could not get your location (' + err.message + ').'),
+      { enableHighAccuracy: true, timeout: 8000 }
+    );
+  }, 'Aliko uses your location to sort businesses by distance from you. Your browser will ask you to confirm next.');
 });

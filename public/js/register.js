@@ -46,6 +46,7 @@ document.getElementById('registerForm').addEventListener('submit', async (e) => 
     whatsapp: readCountryPhoneField('f-whatsapp'),
     description: document.getElementById('f-desc').value.trim(),
     tags: document.getElementById('f-tags').value.trim(),
+    aliases: document.getElementById('f-aliases').value.split(',').map((s) => s.trim()).filter(Boolean),
     lat: document.getElementById('f-lat').value,
     lng: document.getElementById('f-lng').value,
     building: document.getElementById('f-building').value.trim(),

@@ -55,6 +55,7 @@ async function withComputed(biz) {
     hours: biz.hours_json ? JSON.parse(biz.hours_json) : null,
     aliases: parseJsonArray(biz.aliases_json),
     entrances: parseJsonArray(biz.entrances_json),
+    social: parseJsonObject(biz.social_json),
   };
 }
 
@@ -91,6 +92,7 @@ function nameSimilarity(query, name) {
 }
 
 function parseJsonArray(text) { try { const v = JSON.parse(text || '[]'); return Array.isArray(v) ? v : []; } catch (e) { return []; } }
+function parseJsonObject(text) { try { const v = JSON.parse(text || '{}'); return v && typeof v === 'object' && !Array.isArray(v) ? v : {}; } catch (e) { return {}; } }
 
 // ---------- Search / list ----------
 // This endpoint is intentionally kept to one main SQL query. The old version
@@ -199,6 +201,7 @@ router.get('/', async (req, res) => {
     distanceKm: b.distanceKm == null ? null : Number(b.distanceKm),
     aliases: parseJsonArray(b.aliases_json),
     entranceCount: parseJsonArray(b.entrances_json).length,
+    social: parseJsonObject(b.social_json),
   }));
 
   if (openNow === '1') result = result.filter((b) => b.openNow !== false);
@@ -350,6 +353,7 @@ router.put('/:id', requireAuth, async (req, res) => {
     if (req.body.hours) { params.push(JSON.stringify(req.body.hours)); sets.push(`hours_json = $${params.length}`); }
     if (req.body.aliases !== undefined) { params.push(JSON.stringify(req.body.aliases || [])); sets.push(`aliases_json = $${params.length}`); }
     if (req.body.entrances !== undefined) { params.push(JSON.stringify(req.body.entrances || [])); sets.push(`entrances_json = $${params.length}`); }
+    if (req.body.social !== undefined) { params.push(JSON.stringify(req.body.social || {})); sets.push(`social_json = $${params.length}`); }
     if (!sets.length && req.body.tags === undefined) return res.status(400).json({ error: 'No editable fields supplied.' });
     if (sets.length) {
       params.push(req.params.id);

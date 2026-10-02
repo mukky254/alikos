@@ -49,6 +49,11 @@ function paint() {
         <div class="field"><label>Description</label><textarea id="e-desc" rows="2">${escapeHtml(b.description)}</textarea></div>
         <div class="field"><label>Products / keywords</label><input id="e-tags" value="${escapeHtml((b.tags || []).join(', '))}"></div>
         <div class="field"><label>Also known as (comma-separated)</label><input id="e-aliases" value="${escapeHtml((b.aliases || []).join(', '))}" placeholder="e.g. Al Huda, Alhuda, Al-Huda Electronics"></div>
+        <div class="field-grid">
+          <div class="field"><label>📷 Instagram</label><input id="e-social-instagram" value="${escapeHtml((b.social && b.social.instagram) || '')}" placeholder="https://instagram.com/..."></div>
+          <div class="field"><label>📘 Facebook</label><input id="e-social-facebook" value="${escapeHtml((b.social && b.social.facebook) || '')}" placeholder="https://facebook.com/..."></div>
+          <div class="field"><label>🎵 TikTok</label><input id="e-social-tiktok" value="${escapeHtml((b.social && b.social.tiktok) || '')}" placeholder="https://tiktok.com/@..."></div>
+        </div>
         <div class="field-grid"><div class="field"><label>Building</label><input id="e-building" value="${escapeHtml(b.building)}"></div><div class="field"><label>Floor</label><input id="e-floor" value="${escapeHtml(b.floor)}"></div><div class="field"><label>Shop</label><input id="e-shop" value="${escapeHtml(b.shop)}"></div></div>
         <div class="field-grid"><div class="field"><label>Entrance</label><input id="e-entrance" value="${escapeHtml(b.entrance)}"></div><div class="field"><label>Landmark</label><input id="e-landmark" value="${escapeHtml(b.landmark)}"></div></div>
         <button class="btn primary" type="submit">Save changes</button>
@@ -172,6 +177,11 @@ function wireForms(b) {
         phone: readCountryPhoneField('e-phone'), whatsapp: readCountryPhoneField('e-whatsapp'),
         description: document.getElementById('e-desc').value.trim(), tags: document.getElementById('e-tags').value.trim(),
         aliases: document.getElementById('e-aliases').value.split(',').map((s) => s.trim()).filter(Boolean),
+        social: {
+          instagram: document.getElementById('e-social-instagram').value.trim(),
+          facebook: document.getElementById('e-social-facebook').value.trim(),
+          tiktok: document.getElementById('e-social-tiktok').value.trim(),
+        },
         building: document.getElementById('e-building').value.trim(), floor: document.getElementById('e-floor').value.trim(),
         shop: document.getElementById('e-shop').value.trim(), entrance: document.getElementById('e-entrance').value.trim(),
         landmark: document.getElementById('e-landmark').value.trim(),

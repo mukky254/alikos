@@ -114,18 +114,32 @@ async function loadResults() {
   }
 }
 
+let resultsClusterGroup = null;
 function renderMap(businesses) {
   if (typeof L === 'undefined') return;
   if (!resultsMap) resultsMap = L.map('resultsMap');
+  // Feature: marker clustering. Without this, a dense area (many shops in
+  // one building/street) renders as an unreadable pile of overlapping
+  // pins at normal zoom — clusters collapse nearby pins into a single
+  // numbered bubble that expands as you zoom in, same pattern every
+  // mapping app uses for dense results.
+  const hasCluster = typeof L.markerClusterGroup === 'function';
+  if (resultsClusterGroup) { resultsMap.removeLayer(resultsClusterGroup); resultsClusterGroup = null; }
   resultsMarkers.forEach((m) => resultsMap.removeLayer(m));
   resultsMarkers = [];
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap contributors', maxZoom: 19 }).addTo(resultsMap);
+  if (!resultsMap._tileLayerAdded) {
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap contributors', maxZoom: 19 }).addTo(resultsMap);
+    resultsMap._tileLayerAdded = true;
+  }
   const withCoords = businesses.filter((b) => b.lat && b.lng);
   if (!withCoords.length) { resultsMap.setView([-1.2841, 36.8233], 14); return; }
+  if (hasCluster) resultsClusterGroup = L.markerClusterGroup({ maxClusterRadius: 50, spiderfyOnMaxZoom: true });
   withCoords.forEach((b) => {
-    const marker = L.marker([b.lat, b.lng]).addTo(resultsMap).bindPopup(`<strong>${escapeHtml(b.name)}</strong><br>${escapeHtml(b.building)}<br><a href="business.html?id=${b.id}">View profile →</a>`);
+    const marker = L.marker([b.lat, b.lng]).bindPopup(`<strong>${escapeHtml(b.name)}</strong><br>${escapeHtml(b.building)}<br><a href="business.html?id=${b.id}">View profile →</a>`);
+    if (hasCluster) resultsClusterGroup.addLayer(marker); else marker.addTo(resultsMap);
     resultsMarkers.push(marker);
   });
+  if (hasCluster) resultsMap.addLayer(resultsClusterGroup);
   const group = L.featureGroup(resultsMarkers);
   resultsMap.fitBounds(group.getBounds().pad(0.2));
 }
@@ -197,6 +211,34 @@ async function loadSuggestions(q) {
     box.style.display = 'block';
     box.querySelectorAll('.suggest-item').forEach((row) => row.addEventListener('mousedown', () => { saveRecentSearch(row.querySelector('strong').textContent); window.location.href = 'business.html?id=' + row.dataset.id; }));
   } catch (e) { box.style.display = 'none'; }
+}
+
+// Feature: voice search (Web Speech API). Not supported in every browser
+// (notably missing in desktop Firefox) — the mic button only appears when
+// the API actually exists, rather than showing a button that would just
+// fail silently.
+const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
+if (SpeechRecognitionAPI) {
+  const voiceBtn = document.getElementById('voiceSearchBtn');
+  voiceBtn.classList.remove('hidden');
+  let recognition = null;
+  voiceBtn.addEventListener('click', () => {
+    if (recognition) { recognition.stop(); return; }
+    recognition = new SpeechRecognitionAPI();
+    recognition.lang = 'en-US';
+    recognition.interimResults = false;
+    voiceBtn.classList.add('listening');
+    recognition.onresult = (e) => {
+      const transcript = e.results[0][0].transcript;
+      document.getElementById('searchInput').value = transcript;
+      state.query = transcript;
+      saveRecentSearch(transcript);
+      loadResults();
+    };
+    recognition.onerror = () => toast('Could not hear you — try again.');
+    recognition.onend = () => { voiceBtn.classList.remove('listening'); recognition = null; };
+    recognition.start();
+  });
 }
 
 document.getElementById('nearMeBtn').addEventListener('click', () => {

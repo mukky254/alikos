@@ -247,6 +247,46 @@ async function initSchema() {
     -- present, navigation can pick the nearest one to the user).
     ALTER TABLE businesses ADD COLUMN IF NOT EXISTS entrances_json TEXT DEFAULT '[]';
 
+    -- Social media links, JSON text like aliases/entrances above:
+    -- {"instagram": "...", "facebook": "...", "tiktok": "..."}.
+    ALTER TABLE businesses ADD COLUMN IF NOT EXISTS social_json TEXT DEFAULT '{}';
+
+    -- In-app messaging: one thread per (business, customer) pair.
+    CREATE TABLE IF NOT EXISTS message_threads (
+      id SERIAL PRIMARY KEY,
+      business_id INTEGER NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
+      customer_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      created_at BIGINT NOT NULL,
+      UNIQUE (business_id, customer_id)
+    );
+    CREATE TABLE IF NOT EXISTS messages (
+      id SERIAL PRIMARY KEY,
+      thread_id INTEGER NOT NULL REFERENCES message_threads(id) ON DELETE CASCADE,
+      sender_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      sender_role TEXT NOT NULL, -- 'customer' or 'owner'
+      text TEXT NOT NULL,
+      created_at BIGINT NOT NULL,
+      read_by_customer INTEGER NOT NULL DEFAULT 0,
+      read_by_owner INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE INDEX IF NOT EXISTS idx_messages_thread ON messages(thread_id);
+    CREATE INDEX IF NOT EXISTS idx_message_threads_business ON message_threads(business_id);
+    CREATE INDEX IF NOT EXISTS idx_message_threads_customer ON message_threads(customer_id);
+
+    -- Temporary live-location shares ("share my trip"): one row per active
+    -- share, expires naturally — no need to ever look this up after
+    -- expires_at, so no cleanup job is required for correctness (an
+    -- expired row simply always reads as "expired" to viewers).
+    CREATE TABLE IF NOT EXISTS live_shares (
+      token TEXT PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      business_id INTEGER REFERENCES businesses(id) ON DELETE SET NULL,
+      lat DOUBLE PRECISION,
+      lng DOUBLE PRECISION,
+      updated_at BIGINT NOT NULL,
+      expires_at BIGINT NOT NULL
+    );
+
     CREATE INDEX IF NOT EXISTS idx_businesses_category ON businesses(category);
     CREATE INDEX IF NOT EXISTS idx_businesses_owner ON businesses(owner_id);
     CREATE INDEX IF NOT EXISTS idx_reviews_business ON reviews(business_id);

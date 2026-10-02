@@ -152,6 +152,9 @@ function render(b) {
         <button class="icon-btn" id="shareBtn" title="Share">🔗</button>
         <button class="icon-btn" id="printBtn" title="Print">🖨</button>
         <button class="icon-btn" id="qrBtn" title="QR code">▦</button>
+        ${b.social && b.social.instagram ? `<a class="icon-btn" href="${escapeHtml(b.social.instagram)}" target="_blank" rel="noopener" title="Instagram">📷</a>` : ''}
+        ${b.social && b.social.facebook ? `<a class="icon-btn" href="${escapeHtml(b.social.facebook)}" target="_blank" rel="noopener" title="Facebook">📘</a>` : ''}
+        ${b.social && b.social.tiktok ? `<a class="icon-btn" href="${escapeHtml(b.social.tiktok)}" target="_blank" rel="noopener" title="TikTok">🎵</a>` : ''}
       </div>
     </div>
     <div class="qr-panel hidden" id="qrPanel"></div>
@@ -168,6 +171,7 @@ function render(b) {
     <div class="action-row">
       <a class="btn" href="tel:${escapeHtml(phoneLink)}">📞 Call</a>
       ${waNum ? `<a class="btn" href="https://wa.me/${waNum}" target="_blank" rel="noopener">💬 WhatsApp</a>` : ''}
+      ${user && !isOwner ? `<button class="btn ghost" id="messageBizBtn">💬 Message</button>` : ''}
       ${b.phone ? `<button class="btn ghost" id="copyPhoneBtn">📋 Copy phone</button>` : ''}
       <button class="btn ghost" id="copyAddrBtn">📋 Copy address</button>
       <button class="btn ghost" id="copyLinkBtn">🔗 Copy link</button>
@@ -273,6 +277,14 @@ function wireActions(b, user, isOwner) {
     const url = window.location.href;
     api('/businesses/' + b.id + '/track', { method: 'POST', body: { type: 'share' } }).catch(() => {});
     shareOrCopy({ title: b.name, url });
+  });
+
+  const messageBtn = document.getElementById('messageBizBtn');
+  if (messageBtn) messageBtn.addEventListener('click', async () => {
+    try {
+      const { thread } = await api('/messages/threads/business/' + b.id, { method: 'POST' });
+      window.location.href = 'messages.html?thread=' + thread.id;
+    } catch (e) { toast(e.message); }
   });
 
   document.getElementById('copyAddrBtn').addEventListener('click', () => {
@@ -498,7 +510,8 @@ const NAV = {
   currentLat: null, currentLng: null, currentBearing: 0,
   animLat: null, animLng: null, animBearing: 0, animRaf: null,
   headingUp: true, pitchOn: true,
-  profile: 'foot', batterySaver: false, finalApproachShown: false,
+  profile: 'foot', batterySaver: false, finalApproachShown: false, speedAnnotation: null,
+  liveShareToken: null, liveShareTimer: null,
 };
 
 const ARRIVAL_M = 30;
@@ -947,7 +960,8 @@ function resetNav() {
   clearInterval(NAV.beaconTimer);
   cancelAnimationFrame(NAV.animRaf);
   NAV.route = null; NAV.coords = []; NAV.steps = []; NAV.stepIndex = 0; NAV.progressIndex = 0;
-  NAV.altRoute = null; NAV.altCoords = null;
+  NAV.altRoute = null; NAV.altCoords = null; NAV.speedAnnotation = null;
+  clearInterval(NAV.liveShareTimer); NAV.liveShareToken = null; NAV.liveShareTimer = null;
   NAV.lastRouteAt = 0; NAV.rerouting = false; NAV.userMovedMap = false; NAV.lastSpoken = ''; NAV.spokenThresholds = null;
   NAV.currentLat = null; NAV.currentLng = null; NAV.currentBearing = 0;
   NAV.animLat = null; NAV.animLng = null; NAV.firstFixAt = 0; NAV.finalApproachShown = false;
@@ -1030,6 +1044,7 @@ async function onGpsUpdate(pos) {
   updateStats(closest);
   updateRouteSplit(closest);
   updateProgressBar();
+  updateTypicalSpeed(closest);
 }
 
 // Feature: haptic cues on turns/arrival — a short vibration pattern gives a
@@ -1197,6 +1212,12 @@ function applyRoute(data, opts) {
   NAV.coords = route.geometry.coordinates;
   NAV.steps = extractSteps(route);
   NAV.stepIndex = 0; NAV.progressIndex = 0; NAV.lastRouteAt = Date.now(); NAV.spokenThresholds = new Set();
+  // Note: this is NOT a posted speed limit — OSRM's public routing API
+  // doesn't actually expose real speed-limit-sign data (verified before
+  // building this; it's a known gap in OSRM's own API, not something we
+  // chose to skip). This is the router's own assumed travel speed for
+  // each road segment, honestly labeled as "typical speed" in the UI.
+  NAV.speedAnnotation = (route.legs && route.legs[0] && route.legs[0].annotation && route.legs[0].annotation.speed) || null;
 
   NAV.altRoute = (opts.alternatives && data.routes[1] && data.routes[1].geometry) ? data.routes[1] : null;
   setRouteData(NAV.coords, 0);
@@ -1514,7 +1535,59 @@ function speak(step, dist) {
   window.speechSynthesis.cancel();
   const u = new SpeechSynthesisUtterance(msg);
   u.rate = 0.95;
+  const chosen = getChosenVoice();
+  if (chosen) u.voice = chosen;
   window.speechSynthesis.speak(u);
+}
+
+// Feature: voice selection for turn announcements. The browser exposes
+// whatever voices the OS/browser ships with (varies a lot by device), so
+// this lists whatever's actually available rather than a fixed set, and
+// remembers the choice across sessions.
+function getAvailableVoices() {
+  if (!window.speechSynthesis) return [];
+  return window.speechSynthesis.getVoices().filter((v) => v.lang && v.lang.toLowerCase().startsWith('en'));
+}
+function getChosenVoice() {
+  if (!window.speechSynthesis) return null;
+  const savedURI = localStorage.getItem('aliko_voice_uri');
+  if (!savedURI) return null;
+  return window.speechSynthesis.getVoices().find((v) => v.voiceURI === savedURI) || null;
+}
+function openVoicePicker() {
+  const voices = getAvailableVoices();
+  const overlay = document.createElement('div');
+  overlay.className = 'arrival-overlay';
+  if (!voices.length) {
+    overlay.innerHTML = `<div class="arrival-card"><div class="arrival-title">No extra voices found</div><p class="muted" style="margin:10px 0 16px;">Your browser only offers its default voice. This varies by device — some phones offer more voices under their own system settings.</p><button class="btn primary block" id="voicePickerClose">Close</button></div>`;
+    document.body.appendChild(overlay);
+    overlay.querySelector('#voicePickerClose').addEventListener('click', () => overlay.remove());
+    return;
+  }
+  const current = localStorage.getItem('aliko_voice_uri');
+  overlay.innerHTML = `<div class="arrival-card" style="text-align:left;">
+    <div class="arrival-title">Choose a voice</div>
+    <div class="report-options" style="max-height:50vh;overflow-y:auto;">
+      <label class="report-option"><input type="radio" name="voicePick" value="" ${!current ? 'checked' : ''}> Default</label>
+      ${voices.map((v) => `<label class="report-option"><input type="radio" name="voicePick" value="${escapeHtml(v.voiceURI)}" ${current === v.voiceURI ? 'checked' : ''}> ${escapeHtml(v.name)} (${escapeHtml(v.lang)})</label>`).join('')}
+    </div>
+    <div style="display:flex;gap:10px;margin-top:14px;">
+      <button class="btn ghost block" id="voicePickerClose">Cancel</button>
+      <button class="btn primary block" id="voicePickerSave">Save</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+  overlay.querySelector('#voicePickerClose').addEventListener('click', () => overlay.remove());
+  overlay.querySelector('#voicePickerSave').addEventListener('click', () => {
+    const picked = overlay.querySelector('input[name="voicePick"]:checked').value;
+    if (picked) localStorage.setItem('aliko_voice_uri', picked); else localStorage.removeItem('aliko_voice_uri');
+    if (window.speechSynthesis) {
+      const u = new SpeechSynthesisUtterance('This is how I sound.');
+      const v = getChosenVoice(); if (v) u.voice = v;
+      window.speechSynthesis.speak(u);
+    }
+    overlay.remove();
+  });
 }
 
 function closestOnRoute(lat, lng) {
@@ -1553,6 +1626,25 @@ function updateGpsPill(accuracy) {
   else { dot.className = 'nav-gps-dot bad'; text.textContent = 'POOR'; }
   if (accEl) accEl.textContent = Math.round(accuracy) + 'm';
 }
+// Honest substitute for "speed limit" — OSRM's public routing API doesn't
+// expose real posted speed-limit data (confirmed before building this),
+// so rather than fake a number, this shows what OSRM actually gives us:
+// its own assumed travel speed for the current road segment. Driving
+// mode only — meaningless for a pedestrian route.
+function updateTypicalSpeed(closest) {
+  const chip = document.getElementById('navTypicalSpeedChip');
+  if (!chip) return;
+  const arr = NAV.speedAnnotation;
+  if (NAV.profile !== 'driving' || !arr || !closest || !Number.isFinite(closest.index) || arr[closest.index] == null) {
+    chip.classList.add('hidden');
+    return;
+  }
+  const kmh = Math.round(Number(arr[closest.index]) * 3.6);
+  if (!Number.isFinite(kmh) || kmh <= 0) { chip.classList.add('hidden'); return; }
+  chip.textContent = `🛣 Typical speed here: ${kmh} km/h`;
+  chip.classList.remove('hidden');
+}
+
 function updateSpeed(speed) {
   const el = document.getElementById('navSpeed');
   if (!el) return;
@@ -1647,23 +1739,45 @@ document.getElementById('navMuteBtn').addEventListener('click', (e) => {
 document.getElementById('navDetailsBtn').addEventListener('click', () => { if (currentBusiness_forNav) showArrivalCard(currentBusiness_forNav, false); });
 document.getElementById('navProfileWalk').addEventListener('click', () => setProfile('foot'));
 document.getElementById('navProfileDrive').addEventListener('click', () => setProfile('driving'));
+document.getElementById('navVoicePickerBtn').addEventListener('click', openVoicePicker);
 document.getElementById('navAltSwitchBtn').addEventListener('click', switchAltRoute);
 document.getElementById('navShareBtn').addEventListener('click', shareTrip);
 // Feature: share trip / live ETA. One tap to send a formatted ETA message
 // via the device's native share sheet (WhatsApp, SMS, etc.) or fall back
 // to copying it — handy for "I'm on my way, here's when I'll arrive".
-function shareTrip() {
+// Feature: live location sharing. Upgraded from a one-time static ETA
+// text snapshot into a real link that shows the sharer's position
+// updating live for the length of the trip (3-hour hard expiry, no
+// account needed to view) — genuinely useful for "tell someone where I
+// am right now", not just "here's roughly when I'll arrive".
+async function shareTrip() {
   const b = currentBusiness_forNav;
   if (!b) return;
+  if (!getUser()) { toast('Log in to share your live location.'); return; }
   const etaEl = document.getElementById('navEta');
   const remEl = document.getElementById('navRemaining');
-  const text = `Heading to ${b.name} — ETA ${etaEl ? etaEl.textContent : '—'} (${remEl ? remEl.textContent : '—'} left).`;
-  if (navigator.share) {
-    navigator.share({ title: 'My trip', text }).catch(() => {});
-  } else {
-    const url = 'https://wa.me/?text=' + encodeURIComponent(text);
-    window.open(url, '_blank');
+  const summary = `Heading to ${b.name} — ETA ${etaEl ? etaEl.textContent : '—'} (${remEl ? remEl.textContent : '—'} left).`;
+
+  if (!NAV.liveShareToken && NAV.currentLat != null) {
+    try {
+      const { token } = await api('/live', { method: 'POST', body: { lat: NAV.currentLat, lng: NAV.currentLng, businessId: b.id } });
+      NAV.liveShareToken = token;
+      startLiveShareUpdates();
+    } catch (e) { toast('Could not start live sharing: ' + e.message); }
   }
+
+  const url = NAV.liveShareToken ? (window.location.origin + '/track.html?token=' + NAV.liveShareToken) : window.location.href;
+  const text = NAV.liveShareToken ? summary + ' Watch my live position:' : summary;
+  if (navigator.share) navigator.share({ title: 'My trip', text, url }).catch(() => {});
+  else window.open('https://wa.me/?text=' + encodeURIComponent(text + ' ' + url), '_blank');
+}
+
+function startLiveShareUpdates() {
+  clearInterval(NAV.liveShareTimer);
+  NAV.liveShareTimer = setInterval(() => {
+    if (!NAV.liveShareToken || NAV.currentLat == null) return;
+    api('/live/' + NAV.liveShareToken, { method: 'PUT', body: { lat: NAV.currentLat, lng: NAV.currentLng } }).catch(() => {});
+  }, 15000);
 }
 
 document.getElementById('navRecenterBtn').addEventListener('click', () => {

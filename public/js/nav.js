@@ -9,6 +9,7 @@ const NAV_TABS = [
   { href: 'index.html', label: 'Discover', key: 'home', icon: '🔎' },
   { href: 'saved.html', label: 'Saved', key: 'saved', authOnly: true, icon: '★' },
   { href: 'deals.html', label: 'Deals', key: 'deals', icon: '🏷' },
+  { href: 'messages.html', label: 'Messages', key: 'messages', authOnly: true, icon: '💬' },
   { href: 'register.html', label: 'List a business', key: 'register', authOnly: true, icon: '➕' },
   { href: 'dashboard.html', label: 'Dashboard', key: 'dashboard', authOnly: true, icon: '📊' },
   { href: 'account.html', label: 'Account', key: 'account', authOnly: true, icon: '👤' },

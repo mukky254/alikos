@@ -304,75 +304,155 @@ function initAddBusinessFab() {
   document.body.appendChild(fab);
 }
 
-/* 25. Phone/WhatsApp country-code handling.
+/* 25. Phone/WhatsApp handling — Kenya-only (+254), fixed prefix.
    Fix: tel:/wa.me links were built directly from whatever text a business
    owner typed (often a local format like "0712345678"), which wa.me
    silently rejects or misroutes — it requires a full international
-   number with country code and no leading zero. This provides a proper
-   country-code selector for forms, and a normalizer used everywhere a
-   phone number is turned into a tel:/wa.me link, so both new entries and
-   existing legacy numbers resolve correctly. */
-const ALIKO_COUNTRY_CODES = [
-  { cc: '254', label: '🇰🇪 Kenya +254' },
-  { cc: '234', label: '🇳🇬 Nigeria +234' },
-  { cc: '255', label: '🇹🇿 Tanzania +255' },
-  { cc: '256', label: '🇺🇬 Uganda +256' },
-  { cc: '233', label: '🇬🇭 Ghana +233' },
-  { cc: '27', label: '🇿🇦 South Africa +27' },
-  { cc: '251', label: '🇪🇹 Ethiopia +251' },
-  { cc: '250', label: '🇷🇼 Rwanda +250' },
-  { cc: '20', label: '🇪🇬 Egypt +20' },
-  { cc: '1', label: '🇺🇸/🇨🇦 US/Canada +1' },
-  { cc: '44', label: '🇬🇧 UK +44' },
-  { cc: '91', label: '🇮🇳 India +91' },
-  { cc: 'other', label: 'Other (type full number with +)' },
-];
-
+   number with country code and no leading zero. A prior version of this
+   had a multi-country dropdown, but its layout overlapped on narrow
+   phones inside the two-column field grid — removed in favor of a
+   simple fixed "+254" prefix, since Aliko is Kenya-only right now. */
 function countryPhoneFieldHTML(idPrefix, labelText, existingValue) {
-  const { cc, local } = splitE164(existingValue);
-  const options = ALIKO_COUNTRY_CODES.map((c) => `<option value="${c.cc}" ${cc === c.cc ? 'selected' : ''}>${c.label}</option>`).join('');
+  const local = stripToLocal(existingValue);
   return `<div class="field"><label>${labelText}</label><div class="phone-field-row">
-    <select id="${idPrefix}-cc" class="phone-cc-select">${options}</select>
+    <span class="phone-cc-fixed">🇰🇪 +254</span>
     <input id="${idPrefix}-local" placeholder="7XX XXX XXX" value="${escapeHtml(local)}">
   </div></div>`;
 }
-// Best-effort split of a possibly-already-combined legacy number, so
-// editing an existing business pre-fills the country selector sensibly
-// instead of showing the whole jumbled string in the local-number box.
-function splitE164(value) {
-  const v = (value || '').trim();
-  if (v.startsWith('+')) {
-    const match = ALIKO_COUNTRY_CODES.find((c) => c.cc !== 'other' && v.startsWith('+' + c.cc));
-    if (match) return { cc: match.cc, local: v.slice(match.cc.length + 1) };
-    return { cc: 'other', local: v };
-  }
-  return { cc: '254', local: v };
+// Best-effort strip of a possibly-already-combined legacy number down to
+// just the local part, so editing an existing business pre-fills sensibly.
+function stripToLocal(value) {
+  const digits = (value || '').replace(/\D/g, '');
+  if (digits.startsWith('254')) return digits.slice(3);
+  return digits.replace(/^0+/, '');
 }
 function readCountryPhoneField(idPrefix) {
-  const ccEl = document.getElementById(idPrefix + '-cc');
   const localEl = document.getElementById(idPrefix + '-local');
-  if (!ccEl || !localEl) return '';
-  return combinePhoneE164(ccEl.value, localEl.value);
-}
-function combinePhoneE164(countryCode, local) {
-  local = (local || '').trim();
-  if (!local) return '';
-  if (countryCode === 'other' || local.startsWith('+')) return '+' + local.replace(/[^\d]/g, '');
-  const digits = local.replace(/\D/g, '').replace(/^0+/, '');
-  if (!digits) return '';
-  return '+' + countryCode + digits;
+  if (!localEl) return '';
+  const digits = localEl.value.replace(/\D/g, '').replace(/^0+/, '');
+  return digits ? '+254' + digits : '';
 }
 // Normalizes a possibly-legacy (no country code, leading-zero) number for
-// building tel:/wa.me links. defaultCC is a last-resort guess for old
-// data saved before this fix existed — never applied to numbers that
-// already look international.
-function normalizePhoneForLink(value, defaultCC) {
+// building tel:/wa.me links.
+function normalizePhoneForLink(value) {
   const v = (value || '').trim();
   if (!v) return '';
   if (v.startsWith('+')) return v.replace(/[^\d+]/g, '');
   const digits = v.replace(/\D/g, '');
-  if (digits.length > 10) return '+' + digits; // already looks like it has a country code
-  return '+' + (defaultCC || '254') + digits.replace(/^0+/, '');
+  if (digits.startsWith('254') && digits.length > 10) return '+' + digits;
+  return '+254' + digits.replace(/^0+/, '');
+}
+
+/* 26. Location-permission UX. Browsers show their own native permission
+   prompt regardless, but showing *why* first — once, not every time —
+   measurably improves grant rates and avoids a confusing blind "Allow
+   location?" popup with no context the first time someone hits Discover
+   or navigation. */
+function explainLocationThenRequest(onProceed, reason) {
+  if (localStorage.getItem('aliko_loc_explained') === '1') { onProceed(); return; }
+  const overlay = document.createElement('div');
+  overlay.className = 'arrival-overlay';
+  overlay.innerHTML = `<div class="arrival-card" style="text-align:left;">
+    <div class="arrival-title">📍 Use your location?</div>
+    <p class="muted" style="margin:10px 0 16px;">${reason || 'Aliko uses your location to find nearby businesses and give you turn-by-turn directions to the exact shop. Your browser will ask you to confirm next.'}</p>
+    <div style="display:flex;gap:10px;">
+      <button class="btn ghost block" id="locExplainSkip">Not now</button>
+      <button class="btn primary block" id="locExplainGo">Continue</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+  overlay.querySelector('#locExplainSkip').addEventListener('click', () => overlay.remove());
+  overlay.querySelector('#locExplainGo').addEventListener('click', () => {
+    localStorage.setItem('aliko_loc_explained', '1');
+    overlay.remove();
+    onProceed();
+  });
+}
+
+/* 27. Aliko Guide — a site-wide help widget that knows every page and
+   feature in the app and can jump you straight there, plus search
+   businesses directly from the chat. Honest framing: this is a curated
+   rule-based assistant (keyword-matched against a real knowledge base of
+   every page built in this project), not a general conversational LLM —
+   labeled that way deliberately rather than overclaiming, since a real
+   LLM integration would need its own API key, backend proxy, and ongoing
+   cost that hasn't been set up. It still "studies the whole site" in the
+   sense that matters for navigation help: it actually knows every tab. */
+const ALIKO_GUIDE_KB = [
+  { q: ['discover', 'home page', 'search businesses', 'find a shop'], a: 'The Discover tab is the homepage — search by name, category, building or landmark, filter by category or "open now", and sort by distance/rating.', href: 'index.html', label: 'Go to Discover' },
+  { q: ['save', 'bookmark', 'favorite', 'saved places'], a: 'Tap the ☆ star icon on any business page to save it. See everything you\'ve saved on the Saved tab.', href: 'saved.html', label: 'Go to Saved' },
+  { q: ['deal', 'offer', 'discount', 'coupon'], a: 'Active deals from verified businesses are listed on the Deals tab.', href: 'deals.html', label: 'Go to Deals' },
+  { q: ['list my business', 'add business', 'register business', 'new listing'], a: 'Use "List a business" to register — you\'ll need a name, category, phone, and exact building/floor/shop location.', href: 'register.html', label: 'List a business' },
+  { q: ['dashboard', 'my business stats', 'analytics', 'owner'], a: 'Your Dashboard shows views/navigation stats, lets you edit your listing, hours, entrances, and photos, and delete a listing if needed.', href: 'dashboard.html', label: 'Go to Dashboard' },
+  { q: ['message', 'chat', 'contact business', 'inbox'], a: 'Tap "💬 Message" on any business page to start a conversation. All your conversations live in Messages.', href: 'messages.html', label: 'Go to Messages' },
+  { q: ['account', 'profile', 'my link', 'share my profile', 'password'], a: 'Account settings has your profile, password, and your personal shareable Aliko link.', href: 'account.html', label: 'Go to Account' },
+  { q: ['navigate', 'directions', 'get there', 'turn by turn', 'walk', 'drive'], a: 'Open any business page and tap "Start navigation" for full turn-by-turn directions — choose Walk or Drive, and it\'ll guide you right down to the floor and shop number.' },
+  { q: ['share location', 'live location', 'track me', 'where i am'], a: 'While navigating, tap Share to send a live link that shows your position moving in real time for a few hours.' },
+  { q: ['admin', 'verify business', 'moderation'], a: 'Admin tools (verifying listings, reviewing reports) are on the Admin tab — visible only to admin accounts.', href: 'admin.html', label: 'Go to Admin' },
+  { q: ['delete my business', 'remove listing'], a: 'On your Dashboard, each listing has a "🗑 Delete business" button — you\'ll need to type the exact business name to confirm.', href: 'dashboard.html', label: 'Go to Dashboard' },
+  { q: ['review', 'rate a business', 'leave feedback'], a: 'Scroll to the Reviews section on any business page to leave a star rating, write a review, and optionally add a photo.' },
+  { q: ['hours', 'opening hours', 'when open'], a: 'Business hours are shown on each profile with an OPEN NOW / CLOSED badge. Owners set theirs from the Dashboard.' },
+  { q: ['voice search', 'speak', 'microphone'], a: 'Tap the 🎤 mic icon next to the search bar on Discover and say what you\'re looking for.' },
+  { q: ['install', 'app', 'home screen'], a: 'Aliko can be installed like an app — look for the "⬇ Install Aliko" button, or on iPhone use Share → Add to Home Screen.' },
+];
+
+function initAlikoGuide() {
+  const btn = document.createElement('button');
+  btn.className = 'aliko-guide-btn'; btn.title = 'Need help finding something?'; btn.textContent = '💡';
+  document.body.appendChild(btn);
+
+  const panel = document.createElement('div');
+  panel.className = 'aliko-guide-panel hidden';
+  panel.innerHTML = `
+    <div class="guide-header">Aliko Guide <span class="guide-sub">(quick help, not a live agent)</span><button class="guide-close">✕</button></div>
+    <div class="guide-body" id="guideBody"><div class="guide-msg bot">Hi — ask me how to do something ("how do I save a business?"), or type a business name to search for it.</div></div>
+    <form class="guide-form" id="guideForm"><input id="guideInput" placeholder="Ask or search…" autocomplete="off"><button type="submit">→</button></form>
+  `;
+  document.body.appendChild(panel);
+
+  btn.addEventListener('click', () => panel.classList.toggle('hidden'));
+  panel.querySelector('.guide-close').addEventListener('click', () => panel.classList.add('hidden'));
+
+  function addGuideMsg(html, who) {
+    const body = document.getElementById('guideBody');
+    const el = document.createElement('div');
+    el.className = 'guide-msg ' + (who || 'bot');
+    el.innerHTML = html;
+    body.appendChild(el);
+    body.scrollTop = body.scrollHeight;
+  }
+
+  async function handleGuideQuery(text) {
+    const lower = text.toLowerCase();
+    const hit = ALIKO_GUIDE_KB.find((entry) => entry.q.some((k) => lower.includes(k)));
+    if (hit) {
+      addGuideMsg(escapeHtml(hit.a) + (hit.href ? `<br><a class="guide-link" href="${hit.href}">${escapeHtml(hit.label)} →</a>` : ''));
+      return;
+    }
+    // No matching how-to — fall back to treating it as a business search,
+    // so "pharmacy" or a shop name still gets a useful answer.
+    try {
+      const { businesses } = await api('/businesses?q=' + encodeURIComponent(text));
+      if (businesses.length) {
+        addGuideMsg(`Found ${businesses.length} result${businesses.length > 1 ? 's' : ''} for "${escapeHtml(text)}":<br>` +
+          businesses.slice(0, 4).map((b) => `<a class="guide-link" href="business.html?id=${b.id}">${escapeHtml(b.name)}</a>`).join('<br>'));
+      } else {
+        addGuideMsg(`I couldn't find a page for that, and no businesses matched "${escapeHtml(text)}". Try rephrasing, or browse <a class="guide-link" href="index.html">Discover</a>.`);
+      }
+    } catch (e) {
+      addGuideMsg("Couldn't search right now — try the Discover tab directly.");
+    }
+  }
+
+  panel.querySelector('#guideForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const input = document.getElementById('guideInput');
+    const text = input.value.trim();
+    if (!text) return;
+    addGuideMsg(escapeHtml(text), 'me');
+    input.value = '';
+    handleGuideQuery(text);
+  });
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -385,4 +465,5 @@ document.addEventListener('DOMContentLoaded', () => {
   initPasswordToggles();
   initResumeBanner();
   initAddBusinessFab();
+  initAlikoGuide();
 });

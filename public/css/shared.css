@@ -136,6 +136,45 @@
 .report-option{ display: flex; align-items: center; gap: 10px; font-size: 13.5px; padding: 8px 10px; border-radius: var(--radius-sm); background: rgba(255,255,255,.04); cursor: pointer; }
 .report-option:hover{ background: rgba(255,255,255,.08); }
 
+/* In-app messaging */
+.message-bubbles{ display: flex; flex-direction: column; gap: 10px; max-height: 60vh; overflow-y: auto; padding: 10px 2px; margin-bottom: 12px; }
+.bubble{ max-width: 78%; padding: 9px 13px; border-radius: 16px; font-size: 13.5px; }
+.bubble.mine{ align-self: flex-end; background: var(--route); color: #fff; border-bottom-right-radius: 4px; }
+.bubble.theirs{ align-self: flex-start; background: var(--surface-2); color: var(--ink); border-bottom-left-radius: 4px; }
+.bubble-time{ font-size: 10px; opacity: .65; margin-top: 4px; }
+.message-form{ display: flex; gap: 8px; position: sticky; bottom: 0; background: var(--bg); padding-top: 6px; }
+.message-form input{ flex: 1; }
+
+/* Voice search mic button */
+.voice-search-btn{ background: none; border: none; font-size: 18px; padding: 4px 8px; flex: none; }
+.voice-search-btn.hidden{ display: none; }
+.voice-search-btn.listening{ animation: micPulse 1s ease-in-out infinite; }
+@keyframes micPulse{ 0%,100%{ opacity: 1; } 50%{ opacity: .4; } }
+
+/* Aliko Guide widget */
+.aliko-guide-btn{
+  position: fixed; right: 18px; bottom: 150px; z-index: 400; width: 48px; height: 48px; border-radius: 50%;
+  background: rgba(15,18,23,.95); border: 1px solid rgba(255,255,255,.12); font-size: 20px; box-shadow: var(--shadow-card);
+}
+@media (max-width: 720px){ .aliko-guide-btn{ bottom: 136px; } }
+.aliko-guide-panel{
+  position: fixed; right: 18px; bottom: 206px; z-index: 401; width: min(340px, calc(100vw - 36px)); max-height: 60vh;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow-float);
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.aliko-guide-panel.hidden{ display: none; }
+.guide-header{ padding: 12px 14px; border-bottom: 1px solid var(--line); font-weight: 800; font-family: var(--font-display); display: flex; align-items: center; gap: 8px; }
+.guide-sub{ font-size: 10.5px; font-weight: 500; color: var(--ink-faint); }
+.guide-close{ margin-left: auto; background: none; border: none; color: var(--ink-faint); font-size: 14px; }
+.guide-body{ flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+.guide-msg{ font-size: 13px; padding: 8px 11px; border-radius: 12px; max-width: 90%; }
+.guide-msg.bot{ background: var(--surface-2); align-self: flex-start; }
+.guide-msg.me{ background: var(--route); color: #fff; align-self: flex-end; }
+.guide-link{ color: var(--route); font-weight: 700; display: inline-block; margin-top: 4px; }
+.guide-form{ display: flex; gap: 6px; padding: 10px; border-top: 1px solid var(--line); }
+.guide-form input{ flex: 1; }
+.guide-form button{ background: var(--route); color: #fff; border: none; border-radius: 8px; padding: 0 14px; font-weight: 800; }
+
 /* Recent-searches dropdown header */
 .suggest-recent-header{ display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; font-size: 11px; color: var(--ink-faint); text-transform: uppercase; letter-spacing: .04em; }
 .suggest-recent-header button{ background: none; border: none; color: var(--route); font-size: 11px; font-weight: 700; text-transform: none; letter-spacing: 0; }

@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Messages — Aliko</title><link rel="stylesheet" href="css/style.css"><link rel="stylesheet" href="css/shared.css"><link rel="manifest" href="manifest.json"></head>
+<body>
+<div id="app">
+  <div id="site-header"></div>
+  <main class="shell">
+    <div id="threadListView">
+      <h1 class="page-title">Messages</h1>
+      <p class="page-sub">Conversations with businesses, and with customers if you own a listing.</p>
+      <div id="threadList"><div class="loading">Loading…</div></div>
+    </div>
+    <div id="conversationView" class="hidden">
+      <button class="back-link" id="backToThreadsBtn">← All messages</button>
+      <h2 id="conversationTitle" style="margin:6px 0 2px;"></h2>
+      <p class="muted" id="conversationSub" style="font-size:12.5px;margin-bottom:14px;"></p>
+      <div id="messageBubbles" class="message-bubbles"></div>
+      <form id="messageForm" class="message-form">
+        <input id="messageInput" placeholder="Type a message…" autocomplete="off" maxlength="2000">
+        <button class="btn primary" type="submit">Send</button>
+      </form>
+    </div>
+  </main>
+</div>
+<script src="js/api.js"></script>
+<script src="js/shared.js"></script>
+<script src="js/nav.js"></script>
+<script src="js/messages.js"></script>
+</body>
+</html>

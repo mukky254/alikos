@@ -51,6 +51,8 @@ app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/saved', require('./routes/saved'));
 app.use('/api/admin', require('./routes/admin'));
 app.use('/api/directions', require('./routes/directions'));
+app.use('/api/messages', require('./routes/messages'));
+app.use('/api/live', require('./routes/live'));
 
 // Frontend (multi-page static site). On Vercel this is redundant — Vercel
 // serves /public automatically — but it's what makes `npm start` work as a

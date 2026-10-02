@@ -15,7 +15,7 @@
 <link rel="preload" as="script" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
-<link rel="stylesheet" href="css/style.css"><link rel="stylesheet" href="css/shared.css"><link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 <div id="app">
@@ -47,6 +47,7 @@
   <div class="nav-chips">
     <div class="nav-chip hidden" id="navWeatherChip"></div>
     <div class="nav-chip hidden" id="navBatteryChip">🔋 Battery saver</div>
+    <div class="nav-chip hidden" id="navTypicalSpeedChip"></div>
   </div>
 
   <div class="nav-alt-chip hidden" id="navAltChip">
@@ -68,6 +69,7 @@
     <button class="nav-tilt-btn" id="navTiltBtn">3D</button>
     <button class="nav-mode-icon active" id="navProfileWalk" title="Walking directions">🚶</button>
     <button class="nav-mode-icon" id="navProfileDrive" title="Driving directions">🚗</button>
+    <button class="nav-mode-icon" id="navVoicePickerBtn" title="Choose voice">🎙️</button>
   </div>
 
   <div class="nav-gps-pill"><span class="nav-gps-dot" id="navGpsDot"></span><span id="navGpsText">GPS</span></div>
@@ -97,7 +99,6 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script src="js/api.js"></script>
-<script src="js/shared.js"></script>
 <script src="js/nav.js"></script>
 <script src="js/business.js"></script>
 </body>

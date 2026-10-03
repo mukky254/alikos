@@ -5,7 +5,17 @@
 // at any Postgres instance: a free Neon/Supabase database for local dev, and
 // the same (or a separate) one in your Vercel project's environment variables.
 
-const { Pool } = require('pg');
+const { Pool, types } = require('pg');
+
+// Fix: node-postgres returns BIGINT (int8) columns as strings by default,
+// not numbers — PostgreSQL's BIGINT can exceed JS's safe integer range in
+// general, so the driver plays it safe. Every timestamp in this app
+// (created_at, updated_at, verified_at, expires_at, etc.) is a BIGINT
+// storing a millisecond epoch value, which is nowhere near that limit
+// (good for ~285,000 years), so converting to a real Number here is safe
+// and removes a whole class of "is this a string or a number" bugs
+// app-wide — including messages sorting as text instead of chronologically.
+types.setTypeParser(20, (val) => parseInt(val, 10)); // 20 = OID for int8/bigint
 
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) {

@@ -136,12 +136,21 @@
 .report-option{ display: flex; align-items: center; gap: 10px; font-size: 13.5px; padding: 8px 10px; border-radius: var(--radius-sm); background: rgba(255,255,255,.04); cursor: pointer; }
 .report-option:hover{ background: rgba(255,255,255,.08); }
 
-/* In-app messaging */
-.message-bubbles{ display: flex; flex-direction: column; gap: 10px; max-height: 60vh; overflow-y: auto; padding: 10px 2px; margin-bottom: 12px; }
-.bubble{ max-width: 78%; padding: 9px 13px; border-radius: 16px; font-size: 13.5px; }
-.bubble.mine{ align-self: flex-end; background: var(--route); color: #fff; border-bottom-right-radius: 4px; }
-.bubble.theirs{ align-self: flex-start; background: var(--surface-2); color: var(--ink); border-bottom-left-radius: 4px; }
+/* In-app messaging — WhatsApp-style bubble layout */
+.message-bubbles{ display: flex; flex-direction: column; gap: 3px; max-height: 60vh; overflow-y: auto; padding: 10px 2px; margin-bottom: 12px; }
+.bubble{ max-width: 78%; padding: 8px 12px; border-radius: 16px; font-size: 13.5px; margin-bottom: 2px; }
+.bubble.mine{ align-self: flex-end; background: var(--route); color: #fff; border-bottom-right-radius: 16px; }
+.bubble.theirs{ align-self: flex-start; background: var(--surface-2); color: var(--ink); border-bottom-left-radius: 16px; }
+/* Only the last bubble in a consecutive run from the same sender gets the
+   "tail" corner and a visible timestamp — matches how WhatsApp groups a
+   burst of messages from one person instead of repeating chrome on every
+   single bubble. */
+.bubble.mine.last-in-group{ border-bottom-right-radius: 4px; }
+.bubble.theirs.last-in-group{ border-bottom-left-radius: 4px; }
+.bubble:not(.last-in-group){ margin-bottom: 2px; }
+.bubble.last-in-group{ margin-bottom: 10px; }
 .bubble-time{ font-size: 10px; opacity: .65; margin-top: 4px; }
+.date-divider{ align-self: center; font-size: 11px; color: var(--ink-faint); background: var(--surface); padding: 4px 12px; border-radius: 999px; margin: 10px 0 6px; }
 .message-form{ display: flex; gap: 8px; position: sticky; bottom: 0; background: var(--bg); padding-top: 6px; }
 .message-form input{ flex: 1; }
 

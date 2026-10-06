@@ -208,7 +208,14 @@
 /* Mobile: one pane at a time, same as WhatsApp's own phone app — the
    sidebar and the active chat can't both fit on a phone screen. */
 @media (max-width: 860px){
-  .chat-shell{ height: calc(100vh - 140px); border-radius: 0; border: none; margin: 0 -16px; width: calc(100% + 32px); }
+  /* Fix: this used a fixed "-16px" negative margin to bleed edge-to-edge,
+     assuming the parent's padding was always 16px — but main.shell's own
+     padding actually changes at different breakpoints (24px, 14px, then
+     10px on very small phones), so the fixed guess was wrong at most
+     widths and caused real horizontal overflow/overlap. This technique
+     computes the bleed from the viewport directly instead, so it's
+     correct regardless of whatever padding the parent has at any width. */
+  .chat-shell{ height: calc(100vh - 140px); border-radius: 0; border: none; width: 100vw; margin-left: calc(-50vw + 50%); margin-right: calc(-50vw + 50%); }
   .chat-sidebar{ width: 100%; border-right: none; }
   .chat-main{ display: none; }
   .chat-shell.mobile-show-chat .chat-sidebar{ display: none; }

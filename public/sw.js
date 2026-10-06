@@ -4,7 +4,7 @@
 // business data, only static files.
 const CACHE_NAME = 'aliko-shell-v1';
 const SHELL_FILES = [
-  '/index.html', '/business.html', '/saved.html', '/deals.html', '/dashboard.html',
+  '/', '/index.html', '/business.html', '/saved.html', '/deals.html', '/dashboard.html',
   '/account.html', '/login.html', '/signup.html', '/register.html', '/profile.html', '/messages.html', '/track.html',
   '/css/style.css', '/css/shared.css',
   '/js/api.js', '/js/nav.js', '/js/shared.js', '/js/home.js',
@@ -42,14 +42,27 @@ self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
   if (url.pathname.startsWith('/api/')) return; // never cache live data
 
+  // Fix: when a request isn't cached yet AND the network fetch fails
+  // (offline, DNS hiccup, etc.), the old code's `.catch(() => cached)`
+  // returned `undefined` — but respondWith() requires an actual Response
+  // object, never undefined, which is exactly what threw "Failed to
+  // convert value to 'Response'" and crashed the fetch. Restructured so
+  // every code path resolves to a real Response: serve the cached copy
+  // immediately when one exists (refreshing it in the background,
+  // without blocking the response on that refresh), and only hit the
+  // network when there's nothing cached — with a real fallback Response
+  // if even that fails.
   if (CACHEABLE_TILE_ORIGINS.some((o) => url.href.startsWith(o))) {
     event.respondWith(
       caches.open(TILE_CACHE_NAME).then((cache) =>
         cache.match(event.request).then((cached) => {
-          const fetchPromise = fetch(event.request)
+          if (cached) {
+            fetch(event.request).then((resp) => { if (resp && resp.ok) cache.put(event.request, resp); }).catch(() => {});
+            return cached;
+          }
+          return fetch(event.request)
             .then((resp) => { if (resp && resp.ok) cache.put(event.request, resp.clone()); return resp; })
-            .catch(() => cached);
-          return cached || fetchPromise;
+            .catch(() => new Response('', { status: 503, statusText: 'Offline' }));
         })
       )
     );
@@ -60,7 +73,13 @@ self.addEventListener('fetch', (event) => {
 
   event.respondWith(
     caches.match(event.request).then((cached) => {
-      const fetchPromise = fetch(event.request)
+      if (cached) {
+        fetch(event.request).then((resp) => {
+          if (resp && resp.ok) caches.open(CACHE_NAME).then((cache) => cache.put(event.request, resp));
+        }).catch(() => {});
+        return cached;
+      }
+      return fetch(event.request)
         .then((resp) => {
           if (resp && resp.ok) {
             const clone = resp.clone();
@@ -68,8 +87,7 @@ self.addEventListener('fetch', (event) => {
           }
           return resp;
         })
-        .catch(() => cached);
-      return cached || fetchPromise;
+        .catch(() => new Response('<h1>You appear to be offline</h1><p>This page needs a connection and wasn\'t cached yet.</p>', { status: 503, statusText: 'Offline', headers: { 'Content-Type': 'text/html' } }));
     })
   );
 });

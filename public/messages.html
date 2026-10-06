@@ -4,21 +4,36 @@
 <body>
 <div id="app">
   <div id="site-header"></div>
-  <main class="shell">
-    <div id="threadListView">
-      <h1 class="page-title">Messages</h1>
-      <p class="page-sub">Conversations with businesses, and with customers if you own a listing.</p>
-      <div id="threadList"><div class="loading">Loading…</div></div>
-    </div>
-    <div id="conversationView" class="hidden">
-      <button class="back-link" id="backToThreadsBtn">← All messages</button>
-      <h2 id="conversationTitle" style="margin:6px 0 2px;"></h2>
-      <p class="muted" id="conversationSub" style="font-size:12.5px;margin-bottom:14px;"></p>
-      <div id="messageBubbles" class="message-bubbles"></div>
-      <form id="messageForm" class="message-form">
-        <input id="messageInput" placeholder="Type a message…" autocomplete="off" maxlength="2000">
-        <button class="btn primary" type="submit">Send</button>
-      </form>
+  <main class="shell wide">
+    <div class="chat-shell" id="chatShell">
+      <aside class="chat-sidebar" id="chatSidebar">
+        <div class="chat-sidebar-head">
+          <h2>Chats</h2>
+        </div>
+        <div class="chat-search"><input id="chatSearchInput" placeholder="Search chats…" autocomplete="off"></div>
+        <div id="threadList" class="chat-list"><div class="loading">Loading…</div></div>
+      </aside>
+      <section class="chat-main" id="chatMain">
+        <div class="chat-empty" id="chatEmptyState">
+          <div class="chat-empty-icon">💬</div>
+          <p>Select a conversation to start messaging.</p>
+        </div>
+        <div class="chat-active hidden" id="chatActiveView">
+          <div class="chat-main-head">
+            <button class="chat-back-btn" id="chatBackBtn" aria-label="Back to chats">←</button>
+            <div class="chat-avatar" id="conversationAvatar"></div>
+            <div>
+              <div class="chat-main-name" id="conversationTitle"></div>
+              <div class="chat-main-sub" id="conversationSub"></div>
+            </div>
+          </div>
+          <div id="messageBubbles" class="message-bubbles"></div>
+          <form id="messageForm" class="message-form">
+            <input id="messageInput" placeholder="Type a message…" autocomplete="off" maxlength="2000">
+            <button class="btn primary" type="submit">Send</button>
+          </form>
+        </div>
+      </section>
     </div>
   </main>
 </div>

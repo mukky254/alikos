@@ -1,88 +1,131 @@
-// public/js/messages.js
+// public/js/messages.js — two-pane layout: a persistent chat list on the
+// left, the active conversation on the right (matching a real chat app,
+// not two separate full-page views). Clicking a chat updates the right
+// pane in place, no page reload — the sidebar never disappears on desktop.
 renderNav('messages');
 requireLogin();
 
-const params = new URLSearchParams(window.location.search);
-const threadId = params.get('thread');
+let allThreads = [];
+let activeThreadId = new URLSearchParams(window.location.search).get('thread') || null;
 let pollTimer = null;
+let requestSeq = 0;
+let lastRenderedLastId = null;
 
-if (threadId) showConversation(threadId); else showThreadList();
+function avatarInitial(name) { return (name || '?').trim().charAt(0).toUpperCase() || '?'; }
+function avatarColor(name) {
+  let hash = 0;
+  for (let i = 0; i < (name || '').length; i++) hash = (hash * 31 + name.charCodeAt(i)) >>> 0;
+  return `hsl(${hash % 360}, 48%, 42%)`;
+}
+function formatChatTime(ts) {
+  if (!ts) return '';
+  const d = new Date(Number(ts));
+  const now = new Date();
+  if (d.toDateString() === now.toDateString()) return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  const yesterday = new Date(now); yesterday.setDate(now.getDate() - 1);
+  if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
+  const daysAgo = Math.floor((now - d) / 86400000);
+  if (daysAgo < 7) return d.toLocaleDateString([], { weekday: 'short' });
+  return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+}
+function threadDisplayName(t) { return t.role === 'owner' ? (t.customer_name || 'Customer') : (t.business_name || 'Business'); }
 
-async function showThreadList() {
-  document.getElementById('threadListView').classList.remove('hidden');
-  document.getElementById('conversationView').classList.add('hidden');
-  clearInterval(pollTimer);
+async function loadThreadList() {
   const mount = document.getElementById('threadList');
   try {
     const { threads } = await api('/messages/threads');
-    if (!threads.length) { mount.innerHTML = '<div class="empty">No conversations yet. Message a business from its profile page to start one.</div>'; return; }
-    mount.innerHTML = threads.map((t) => `
-      <a class="row" href="messages.html?thread=${t.id}">
-        <div class="row-main">
-          <div class="row-name">${t.role === 'owner' ? escapeHtml(t.customer_name) : escapeHtml(t.business_name)} ${t.unread ? `<span class="badge open">${t.unread} new</span>` : ''}</div>
-          <div class="row-meta">${t.role === 'owner' ? 'Customer · ' + escapeHtml(t.business_name) : 'You → ' + escapeHtml(t.business_name)}</div>
-          <div class="row-loc">${escapeHtml(t.lastMessage || 'No messages yet')}</div>
-        </div>
-      </a>`).join('');
+    allThreads = threads;
+    renderThreadList();
+    if (activeThreadId) openConversation(Number(activeThreadId), false);
   } catch (e) {
     mount.innerHTML = `<div class="error-box">${escapeHtml(e.message)}</div>`;
   }
 }
 
-async function showConversation(id) {
-  document.getElementById('threadListView').classList.add('hidden');
-  document.getElementById('conversationView').classList.remove('hidden');
-  await loadMessages(id, true);
+function renderThreadList(filterText) {
+  const mount = document.getElementById('threadList');
+  const q = (filterText || '').toLowerCase().trim();
+  const list = q ? allThreads.filter((t) => threadDisplayName(t).toLowerCase().includes(q)) : allThreads;
+  if (!list.length) { mount.innerHTML = `<div class="empty">${q ? 'No chats match that search.' : "No conversations yet. Message a business from its profile page to start one."}</div>`; return; }
+  mount.innerHTML = list.map((t) => {
+    const name = threadDisplayName(t);
+    const sub = t.role === 'owner' ? escapeHtml(t.business_name || '') : null;
+    return `
+    <a class="chat-row ${Number(activeThreadId) === t.id ? 'active' : ''}" href="messages.html?thread=${t.id}" data-id="${t.id}">
+      <div class="chat-avatar" style="background:${avatarColor(name)}">${escapeHtml(avatarInitial(name))}</div>
+      <div class="chat-row-main">
+        <div class="chat-row-top">
+          <span class="chat-row-name">${escapeHtml(name)}</span>
+          <span class="chat-row-time">${formatChatTime(t.lastAt || t.created_at)}</span>
+        </div>
+        <div class="chat-row-bottom">
+          <span class="chat-row-preview">${sub ? `<span class="chat-row-sub">${sub}: </span>` : ''}${escapeHtml(t.lastMessage || 'No messages yet')}</span>
+          ${t.unread ? `<span class="chat-unread-badge">${t.unread}</span>` : ''}
+        </div>
+      </div>
+    </a>`;
+  }).join('');
+
+  mount.querySelectorAll('.chat-row').forEach((row) => {
+    row.addEventListener('click', (e) => {
+      e.preventDefault();
+      openConversation(Number(row.dataset.id), true);
+    });
+  });
+}
+
+document.getElementById('chatSearchInput').addEventListener('input', (e) => renderThreadList(e.target.value));
+
+function openConversation(id, updateUrl) {
+  activeThreadId = id;
+  if (updateUrl) history.pushState({}, '', 'messages.html?thread=' + id);
+  document.getElementById('chatEmptyState').classList.add('hidden');
+  document.getElementById('chatActiveView').classList.remove('hidden');
+  document.getElementById('chatShell').classList.add('mobile-show-chat'); // mobile: swap to the conversation pane
+  renderThreadList(document.getElementById('chatSearchInput').value); // refresh active-row highlight
+  lastRenderedLastId = null;
+  loadMessages(id, true);
   clearInterval(pollTimer);
-  // Simple polling rather than a websocket — good enough for a
-  // low-frequency business-inquiry inbox, no extra infrastructure needed.
   pollTimer = setInterval(() => loadMessages(id, false), 4000);
 }
 
-// Fix: the poll timer (every 4s) and a manual reload right after sending
-// a message could both be in flight at once, and — since each is an
-// independent async call — a slower-but-earlier-started request could
-// resolve AFTER a faster-but-later-started one and overwrite the screen
-// with stale/differently-ordered data. This was very likely the actual
-// cause of "messages are out of order": not a sort bug, but an older
-// response landing after a newer one and clobbering it. A simple
-// increasing request-sequence number fixes it — any response that isn't
-// from the latest request in flight is just discarded.
-let requestSeq = 0;
-let lastRenderedLastId = null;
+document.getElementById('chatBackBtn').addEventListener('click', () => {
+  document.getElementById('chatShell').classList.remove('mobile-show-chat'); // mobile: back to the list pane
+});
 
 async function loadMessages(id, isFirstLoad) {
   const mySeq = ++requestSeq;
   try {
     const { messages, role, thread } = await api('/messages/threads/' + id + '/messages');
-    if (mySeq !== requestSeq) return; // a newer request already started/finished — this response is stale, ignore it
+    if (mySeq !== requestSeq) return; // a newer request already started — this response is stale
 
     if (isFirstLoad) {
-      document.getElementById('conversationTitle').textContent = role === 'owner' ? (thread.customer_name || 'Customer') : (thread.business_name || 'Business');
+      const name = role === 'owner' ? (thread.customer_name || 'Customer') : (thread.business_name || 'Business');
+      document.getElementById('conversationTitle').textContent = name;
       document.getElementById('conversationSub').textContent = role === 'owner' ? 'Regarding: ' + (thread.business_name || '') : 'Conversation with this business';
+      const avatarEl = document.getElementById('conversationAvatar');
+      avatarEl.textContent = avatarInitial(name);
+      avatarEl.style.background = avatarColor(name);
     }
     const newLastId = messages.length ? messages[messages.length - 1].id : null;
-    if (newLastId === lastRenderedLastId && !isFirstLoad) return; // nothing new
+    if (newLastId === lastRenderedLastId && !isFirstLoad) return;
     lastRenderedLastId = newLastId;
 
     const bubbles = document.getElementById('messageBubbles');
     const wasNearBottom = bubbles.scrollTop + bubbles.clientHeight >= bubbles.scrollHeight - 40;
     bubbles.innerHTML = renderBubbleHtml(messages, role);
     if (isFirstLoad || wasNearBottom) bubbles.scrollTop = bubbles.scrollHeight;
+    loadThreadListQuiet(); // refresh previews/unread counts in the sidebar without disrupting the open chat
   } catch (e) {
     if (isFirstLoad) document.getElementById('messageBubbles').innerHTML = `<div class="error-box">${escapeHtml(e.message)}</div>`;
   }
 }
 
-// WhatsApp-style rendering: a date divider whenever the day changes, and
-// consecutive bubbles from the same sender grouped tighter with only the
-// last one in a run showing a timestamp — instead of every single bubble
-// repeating the full date/time regardless of who sent it or when.
+async function loadThreadListQuiet() {
+  try { const { threads } = await api('/messages/threads'); allThreads = threads; renderThreadList(document.getElementById('chatSearchInput').value); } catch (e) {}
+}
+
 function renderBubbleHtml(messages, role) {
-  // messages arrives pre-sorted chronologically by the server (ORDER BY id
-  // ASC, the primary key — always insertion order); render in that exact
-  // order rather than re-sorting here, so this stays a single source of
-  // truth for "what order are these in".
   let html = '';
   let lastDay = null;
   messages.forEach((m, i) => {
@@ -102,19 +145,16 @@ function renderBubbleHtml(messages, role) {
   return html;
 }
 
-document.getElementById('backToThreadsBtn').addEventListener('click', () => {
-  window.history.pushState({}, '', 'messages.html');
-  showThreadList();
-});
-
 document.getElementById('messageForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   const input = document.getElementById('messageInput');
   const text = input.value.trim();
-  if (!text || !threadId) return;
+  if (!text || !activeThreadId) return;
   input.value = '';
   try {
-    await api('/messages/threads/' + threadId + '/messages', { method: 'POST', body: { text } });
-    await loadMessages(threadId, false);
+    await api('/messages/threads/' + activeThreadId + '/messages', { method: 'POST', body: { text } });
+    await loadMessages(activeThreadId, false);
   } catch (e) { toast(e.message); input.value = text; }
 });
+
+loadThreadList();

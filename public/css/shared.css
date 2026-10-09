@@ -201,6 +201,9 @@
 .bubble:not(.last-in-group){ margin-bottom: 2px; }
 .bubble.last-in-group{ margin-bottom: 10px; }
 .bubble-time{ font-size: 10px; opacity: .65; margin-top: 4px; }
+.bubble-sender{ font-size: 11px; font-weight: 800; opacity: .8; margin-bottom: 3px; }
+.bubble.mine .bubble-sender{ color: rgba(255,255,255,.85); }
+.bubble.theirs .bubble-sender{ color: var(--route); }
 .date-divider{ align-self: center; font-size: 11px; color: var(--ink-faint); background: var(--surface-2); padding: 4px 12px; border-radius: 999px; margin: 10px 0 6px; }
 .message-form{ display: flex; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--line); flex: none; }
 .message-form input{ flex: 1; }

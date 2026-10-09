@@ -99,13 +99,13 @@ async function loadMessages(id, isFirstLoad) {
     const { messages, role, thread } = await api('/messages/threads/' + id + '/messages');
     if (mySeq !== requestSeq) return; // a newer request already started — this response is stale
 
+    const otherPartyName = role === 'owner' ? (thread.customer_name || 'Customer') : (thread.business_name || 'Business');
     if (isFirstLoad) {
-      const name = role === 'owner' ? (thread.customer_name || 'Customer') : (thread.business_name || 'Business');
-      document.getElementById('conversationTitle').textContent = name;
+      document.getElementById('conversationTitle').textContent = otherPartyName;
       document.getElementById('conversationSub').textContent = role === 'owner' ? 'Regarding: ' + (thread.business_name || '') : 'Conversation with this business';
       const avatarEl = document.getElementById('conversationAvatar');
-      avatarEl.textContent = avatarInitial(name);
-      avatarEl.style.background = avatarColor(name);
+      avatarEl.textContent = avatarInitial(otherPartyName);
+      avatarEl.style.background = avatarColor(otherPartyName);
     }
     const newLastId = messages.length ? messages[messages.length - 1].id : null;
     if (newLastId === lastRenderedLastId && !isFirstLoad) return;
@@ -113,7 +113,7 @@ async function loadMessages(id, isFirstLoad) {
 
     const bubbles = document.getElementById('messageBubbles');
     const wasNearBottom = bubbles.scrollTop + bubbles.clientHeight >= bubbles.scrollHeight - 40;
-    bubbles.innerHTML = renderBubbleHtml(messages, role);
+    bubbles.innerHTML = renderBubbleHtml(messages, role, otherPartyName);
     if (isFirstLoad || wasNearBottom) bubbles.scrollTop = bubbles.scrollHeight;
     loadThreadListQuiet(); // refresh previews/unread counts in the sidebar without disrupting the open chat
   } catch (e) {
@@ -125,7 +125,7 @@ async function loadThreadListQuiet() {
   try { const { threads } = await api('/messages/threads'); allThreads = threads; renderThreadList(document.getElementById('chatSearchInput').value); } catch (e) {}
 }
 
-function renderBubbleHtml(messages, role) {
+function renderBubbleHtml(messages, role, otherPartyName) {
   let html = '';
   let lastDay = null;
   messages.forEach((m, i) => {
@@ -135,9 +135,16 @@ function renderBubbleHtml(messages, role) {
       html += `<div class="date-divider">${d.toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' })}</div>`;
       lastDay = dayKey;
     }
+    const prev = messages[i - 1];
     const next = messages[i + 1];
+    const isMine = m.sender_role === role;
+    const isFirstInGroup = !prev || prev.sender_role !== m.sender_role || new Date(Number(prev.created_at)).toDateString() !== dayKey;
     const isLastInGroup = !next || next.sender_role !== m.sender_role || new Date(Number(next.created_at)).toDateString() !== dayKey;
-    html += `<div class="bubble ${m.sender_role === role ? 'mine' : 'theirs'} ${isLastInGroup ? 'last-in-group' : ''}">
+    // Explicit sender label above the first bubble in each group — belt
+    // and suspenders on top of the side/colour distinction, so there's
+    // never any ambiguity about who sent what, even at a glance.
+    html += `<div class="bubble ${isMine ? 'mine' : 'theirs'} ${isLastInGroup ? 'last-in-group' : ''}">
+      ${isFirstInGroup ? `<div class="bubble-sender">${isMine ? 'You' : escapeHtml(otherPartyName || 'Them')}</div>` : ''}
       <div class="bubble-text">${escapeHtml(m.text)}</div>
       ${isLastInGroup ? `<div class="bubble-time">${d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</div>` : ''}
     </div>`;

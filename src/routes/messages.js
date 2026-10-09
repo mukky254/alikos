@@ -47,8 +47,16 @@ router.post('/threads/business/:businessId', requireAuth, async (req, res) => {
 });
 
 async function threadAccess(threadId, user) {
+  // Fix: this used to select only b.owner_id, so the conversation header
+  // had no business/customer name to show — it fell back to a generic
+  // "Customer" with a blank "Regarding:". Joining both names in here so
+  // the open conversation shows the real people, same as the chat list.
   const thread = await getOne(
-    `SELECT t.*, b.owner_id FROM message_threads t JOIN businesses b ON b.id = t.business_id WHERE t.id = $1`, [threadId]
+    `SELECT t.*, b.owner_id, b.name AS business_name, u.name AS customer_name
+     FROM message_threads t
+     JOIN businesses b ON b.id = t.business_id
+     JOIN users u ON u.id = t.customer_id
+     WHERE t.id = $1`, [threadId]
   );
   if (!thread) return { error: 'Conversation not found.', status: 404 };
   if (thread.customer_id === user.id) return { thread, role: 'customer' };
